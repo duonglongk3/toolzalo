@@ -1,0 +1,439 @@
+import React from 'react'
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Globe, Bell, Shield, Database, Download, Upload, RotateCcw } from 'lucide-react'
+import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Modal, Input } from '@/components/ui'
+import { useAppStore } from '@/store'
+import toast from 'react-hot-toast'
+
+const Settings: React.FC = () => {
+  const { config, updateConfig } = useAppStore()
+  const [showBackupModal, setShowBackupModal] = React.useState(false)
+  const [showRestoreModal, setShowRestoreModal] = React.useState(false)
+  const [backupData, setBackupData] = React.useState('')
+
+  const electronAPI: any = (typeof window !== 'undefined' && (window as any).electronAPI) || null
+  const [versions, setVersions] = React.useState<{ electron?: string; node?: string; chrome?: string } | null>(null)
+  const [appVersion, setAppVersion] = React.useState<string>('N/A')
+
+  React.useEffect(() => {
+    try {
+      const v = electronAPI?.node?.process?.versions
+      if (v) setVersions(v)
+    } catch {}
+    try {
+      electronAPI?.app?.getVersion?.().then((v: string) => v && setAppVersion(v)).catch(() => {})
+    } catch {}
+  }, [])
+
+  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
+    updateConfig({ theme })
+    toast.success('Đã cập nhật giao diện')
+  }
+
+  const handleLanguageChange = (language: 'vi' | 'en') => {
+    updateConfig({ language })
+    toast.success('Đã cập nhật ngôn ngữ')
+  }
+
+  const handleExportData = () => {
+    try {
+      // Get all data from localStorage
+      const data = {
+        accounts: JSON.parse(localStorage.getItem('zalo-accounts') || '{}'),
+        friends: JSON.parse(localStorage.getItem('zalo-friends') || '{}'),
+        groups: JSON.parse(localStorage.getItem('zalo-groups') || '{}'),
+        templates: JSON.parse(localStorage.getItem('zalo-templates') || '{}'),
+        config: JSON.parse(localStorage.getItem('zalo-app') || '{}'),
+        exportedAt: new Date().toISOString(),
+        version: '1.0.0'
+      }
+
+      const jsonContent = JSON.stringify(data, null, 2)
+      const blob = new Blob([jsonContent], { type: 'application/json' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `zalo_manager_backup_${new Date().toISOString().split('T')[0]}.json`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast.success('Đã xuất dữ liệu thành công')
+    } catch (error) {
+      console.error('Export data error:', error)
+      toast.error('Lỗi khi xuất dữ liệu')
+    }
+  }
+
+  const handleImportData = () => {
+    if (!backupData.trim()) {
+      toast.error('Vui lòng dán dữ liệu backup')
+      return
+    }
+
+    try {
+      const data = JSON.parse(backupData)
+
+      // Validate backup data structure
+      if (!data.version || !data.exportedAt) {
+        throw new Error('Invalid backup format')
+      }
+
+      // Restore data to localStorage
+      if (data.accounts) localStorage.setItem('zalo-accounts', JSON.stringify(data.accounts))
+      if (data.friends) localStorage.setItem('zalo-friends', JSON.stringify(data.friends))
+      if (data.groups) localStorage.setItem('zalo-groups', JSON.stringify(data.groups))
+      if (data.templates) localStorage.setItem('zalo-templates', JSON.stringify(data.templates))
+      if (data.config) localStorage.setItem('zalo-app', JSON.stringify(data.config))
+
+      toast.success('Đã khôi phục dữ liệu thành công. Vui lòng tải lại ứng dụng.')
+      setBackupData('')
+      setShowRestoreModal(false)
+
+      // Reload app after 2 seconds
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+    } catch (error) {
+      console.error('Import data error:', error)
+      toast.error('Dữ liệu backup không hợp lệ')
+    }
+  }
+
+  const handleClearData = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa tất cả dữ liệu? Hành động này không thể hoàn tác.')) {
+      localStorage.clear()
+      toast.success('Đã xóa tất cả dữ liệu. Ứng dụng sẽ tải lại.')
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    }
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-secondary-900">Cài đặt</h1>
+          <p className="text-secondary-600 mt-1">
+            Tùy chỉnh ứng dụng và quản lý dữ liệu
+          </p>
+        </div>
+      </div>
+
+      {/* Appearance Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Monitor className="w-5 h-5" />
+            <span>Giao diện</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-3">
+              Chủ đề
+            </label>
+            <div className="flex space-x-2">
+              <Button
+                variant={config.theme === 'light' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleThemeChange('light')}
+                icon={<Sun className="w-4 h-4" />}
+              >
+                Sáng
+              </Button>
+              <Button
+                variant={config.theme === 'dark' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleThemeChange('dark')}
+                icon={<Moon className="w-4 h-4" />}
+              >
+                Tối
+              </Button>
+              <Button
+                variant={config.theme === 'system' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleThemeChange('system')}
+                icon={<Monitor className="w-4 h-4" />}
+              >
+                Hệ thống
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-3">
+              Ngôn ngữ
+            </label>
+            <div className="flex space-x-2">
+              <Button
+                variant={config.language === 'vi' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleLanguageChange('vi')}
+                icon={<Globe className="w-4 h-4" />}
+              >
+                Tiếng Việt
+              </Button>
+              <Button
+                variant={config.language === 'en' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleLanguageChange('en')}
+                icon={<Globe className="w-4 h-4" />}
+              >
+                English
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Bell className="w-5 h-5" />
+            <span>Thông báo</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-secondary-900">Thông báo desktop</h4>
+              <p className="text-sm text-secondary-600">Hiển thị thông báo khi có hoạt động mới</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.notifications}
+                onChange={(e) => updateConfig({ notifications: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Message Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <SettingsIcon className="w-5 h-5" />
+            <span>Tin nhắn</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Delay giữa tin nhắn (s)
+            </label>
+            <Input
+              type="number"
+              value={Math.round((config.messageDelay || 0) / 1000)}
+              onChange={(e) => updateConfig({ messageDelay: Math.max(0, Number(e.target.value) || 0) * 1000 })}
+              min={0}
+              max={600}
+              step={1}
+            />
+            <p className="text-xs text-secondary-500 mt-1">
+              Thời gian chờ giữa các tin nhắn để tránh spam (0-600s)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Số lần thử lại khi thất bại
+            </label>
+            <Input
+              type="number"
+              value={config.maxRetries}
+              onChange={(e) => updateConfig({ maxRetries: Number(e.target.value) })}
+              min={0}
+              max={10}
+            />
+            <p className="text-xs text-secondary-500 mt-1">
+              Số lần thử lại khi gửi tin nhắn thất bại (0-10)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Backup Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Database className="w-5 h-5" />
+            <span>Sao lưu & Khôi phục</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-secondary-900">Tự động sao lưu</h4>
+              <p className="text-sm text-secondary-600">Tự động sao lưu dữ liệu định kỳ</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.backupEnabled}
+                onChange={(e) => updateConfig({ backupEnabled: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+
+          {config.backupEnabled && (
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-2">
+                Tần suất sao lưu (giờ)
+              </label>
+              <Input
+                type="number"
+                value={config.backupInterval}
+                onChange={(e) => updateConfig({ backupInterval: Number(e.target.value) })}
+                min={1}
+                max={168}
+              />
+              <p className="text-xs text-secondary-500 mt-1">
+                Khoảng thời gian giữa các lần sao lưu tự động (1-168 giờ)
+              </p>
+            </div>
+          )}
+
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={handleExportData}
+              icon={<Download className="w-4 h-4" />}
+            >
+              Xuất dữ liệu
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowRestoreModal(true)}
+              icon={<Upload className="w-4 h-4" />}
+            >
+              Khôi phục dữ liệu
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Security Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Shield className="w-5 h-5" />
+            <span>Bảo mật</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-secondary-900">Tự động lưu</h4>
+              <p className="text-sm text-secondary-600">Tự động lưu thay đổi khi chỉnh sửa</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.autoSave}
+                onChange={(e) => updateConfig({ autoSave: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+
+          <div className="pt-4 border-t border-secondary-200">
+            <Button
+              variant="outline"
+              onClick={handleClearData}
+              className="text-error-600 border-error-300 hover:bg-error-50"
+              icon={<RotateCcw className="w-4 h-4" />}
+            >
+              Xóa tất cả dữ liệu
+            </Button>
+            <p className="text-xs text-secondary-500 mt-2">
+              Xóa toàn bộ dữ liệu ứng dụng. Hành động này không thể hoàn tác.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* App Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Thông tin ứng dụng</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex justify-between">
+            <span className="text-secondary-600">Phiên bản:</span>
+            <Badge variant="outline">v{appVersion}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-secondary-600">Electron:</span>
+            <Badge variant="outline">{versions?.electron || 'N/A'}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-secondary-600">Node.js:</span>
+            <Badge variant="outline">{versions?.node || 'N/A'}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-secondary-600">Chrome:</span>
+            <Badge variant="outline">{versions?.chrome || 'N/A'}</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Restore Data Modal */}
+      <Modal
+        open={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        title="Khôi phục dữ liệu"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Dán dữ liệu backup (JSON)
+            </label>
+            <textarea
+              value={backupData}
+              onChange={(e) => setBackupData(e.target.value)}
+              placeholder="Dán nội dung file backup JSON vào đây..."
+              rows={10}
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+            />
+          </div>
+
+          <div className="p-3 bg-warning-50 border border-warning-200 rounded-lg">
+            <p className="text-sm text-warning-800">
+              <strong>Cảnh báo:</strong> Việc khôi phục dữ liệu sẽ ghi đè lên tất cả dữ liệu hiện tại.
+              Hãy chắc chắn bạn đã sao lưu dữ liệu quan trọng trước khi thực hiện.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowRestoreModal(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleImportData}
+              disabled={!backupData.trim()}
+            >
+              Khôi phục
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
+export default Settings

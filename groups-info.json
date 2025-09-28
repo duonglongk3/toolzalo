@@ -1,0 +1,936 @@
+{
+  "ids": [
+    "8582789305635511375",
+    "6405975071863490997",
+    "7406896135689034649",
+    "6971590003530291091",
+    "1879365816211634503",
+    "7336105852658146716",
+    "5948846584868383709",
+    "7040693396795171814",
+    "8637348844545203853",
+    "1969017517077905152",
+    "8980247372137835507",
+    "4019306202570229652",
+    "4380309366543483546",
+    "1582135077624551079",
+    "571616062676934333",
+    "468304132964027948",
+    "5258812493762020520",
+    "5956033487183875579",
+    "5625988364669364800",
+    "3134618093231037651",
+    "8234048323512385558",
+    "8371496425705123454",
+    "3121674449256123905",
+    "7391147170985608129",
+    "8395052488365703890",
+    "9031476110329928709",
+    "7905397917735202790",
+    "4096726550376682889",
+    "3098739920932658259",
+    "2360446990503581330",
+    "8981363235441684471",
+    "472682820905500380",
+    "5638242402064598636",
+    "8097393748917573644",
+    "7128279367008025023",
+    "1610969304923585032",
+    "5492712030180999529",
+    "3249734118904775498",
+    "4335223890869903994",
+    "4968093889378337185",
+    "331568561600817866",
+    "8794892167770800222",
+    "8798962156737401167",
+    "197529220602874094",
+    "1174128229102726168",
+    "7081085311860363286",
+    "2758849660237518874",
+    "8936706617675550294",
+    "8277106442905541517",
+    "8490033691244384385",
+    "505376030885442384",
+    "532482971454149424",
+    "2828373707975168019",
+    "1721461409974191024",
+    "6251872657898758800",
+    "8588562451484979299",
+    "7824206734290390726",
+    "4690646698188025419",
+    "319550792754011196",
+    "6347997045439477579",
+    "2772086443121060139",
+    "8213784857164807086",
+    "7949881381955979776",
+    "5153669984412644822",
+    "6584718905866800434",
+    "4906404759044760644",
+    "6058226472477077568",
+    "3645737360046251467",
+    "3153766587510036631",
+    "3566561709025802285",
+    "4538491451132818088",
+    "5207714795947784726",
+    "4788315463199704608",
+    "4009594766596072695",
+    "2098915211049912947",
+    "8273818254403917697",
+    "7402958021542096367",
+    "6483247334369154986",
+    "3182891775735001208",
+    "1747066057095663981",
+    "5577005456698269494",
+    "9183882451865860896",
+    "6820587501832965876",
+    "8108939010045448155",
+    "2805837981808206243",
+    "1044492939255875373",
+    "1526811273479148131",
+    "2258648593414696971",
+    "7751307678055927489",
+    "2620792296059178253",
+    "6774280155203906128",
+    "5626892844372602693",
+    "6653132524995575559",
+    "6805666306964347681",
+    "8192111197940496099",
+    "8713256430260413624",
+    "7904851564120058336",
+    "2910010337257340209",
+    "2894235586756375929",
+    "1221558104036611232",
+    "3032440497140615238",
+    "3462982219587209565",
+    "2672699836560131396",
+    "8702556504341629590",
+    "291414495790004312",
+    "8651055100586492253",
+    "1230858015618789959",
+    "4514380637473042421",
+    "756396765684171308",
+    "5648005256310052914",
+    "8764490678191796210",
+    "5171400654881846423",
+    "7249862461891350479",
+    "3798208757838018278",
+    "1526832764013335139",
+    "7460107320238741460",
+    "7831244000561870333",
+    "7845880463443720625",
+    "189814779808667633",
+    "4879089072563684069",
+    "8625727559369503975",
+    "8003776013053791040",
+    "2831475555302513432",
+    "8755206617663934163",
+    "2797186911534682",
+    "8082048038892220026",
+    "5818398971303762156",
+    "4469249652434422870",
+    "2276831208259481803",
+    "8390413925904446243",
+    "1357943749343722891",
+    "1249574336776384772"
+  ],
+  "details": [
+    {
+      "id": "8582789305635511375",
+      "name": "Thanh Vân - Kho Sỉ Gia Dụng Và Tiêu Dùng Cao Cấp",
+      "memberCount": 241,
+      "hasAvatar": false
+    },
+    {
+      "id": "6405975071863490997",
+      "name": "HVTD Thông Báo",
+      "memberCount": 490,
+      "hasAvatar": false
+    },
+    {
+      "id": "7406896135689034649",
+      "name": "Nguyễn Hoàng Tú, Dak Nong Farm",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "6971590003530291091",
+      "name": "Chia Sẻ Kinh Nghiệm Nhà Nông",
+      "memberCount": 56,
+      "hasAvatar": false
+    },
+    {
+      "id": "1879365816211634503",
+      "name": "Chợ Xu",
+      "memberCount": 913,
+      "hasAvatar": false
+    },
+    {
+      "id": "7336105852658146716",
+      "name": "35 Chứng Chỉ Spa - Học Dưỡng Sinh Đông Y - Từ Tâm",
+      "memberCount": 545,
+      "hasAvatar": false
+    },
+    {
+      "id": "5948846584868383709",
+      "name": "Share CV ứng viên tìm việc TMĐT, POD, Dropship",
+      "memberCount": 998,
+      "hasAvatar": false
+    },
+    {
+      "id": "7040693396795171814",
+      "name": "Mạnh Cường Nguyễn, Dak Nong Farm",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "8637348844545203853",
+      "name": "Dak Nong Farm, H V T C",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "1969017517077905152",
+      "name": "Technical_Facebook_Farm",
+      "memberCount": 6,
+      "hasAvatar": false
+    },
+    {
+      "id": "8980247372137835507",
+      "name": "HP Tools - Kênh thông báo chính thức",
+      "memberCount": 997,
+      "hasAvatar": false
+    },
+    {
+      "id": "4019306202570229652",
+      "name": "Giá Bắp Xú🌾Cải Thảo🌾 Hàng Ngày (Nhóm Kín)",
+      "memberCount": 16,
+      "hasAvatar": false
+    },
+    {
+      "id": "4380309366543483546",
+      "name": "HR.ThuanThanhGroup",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "1582135077624551079",
+      "name": "CỘNG ĐỒNG NÔNG SẢN VIỆT NAM",
+      "memberCount": 142,
+      "hasAvatar": false
+    },
+    {
+      "id": "571616062676934333",
+      "name": "TOOLMMORE.COM <>",
+      "memberCount": 8,
+      "hasAvatar": false
+    },
+    {
+      "id": "468304132964027948",
+      "name": "Đơn hàng ngày duơng long",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "5258812493762020520",
+      "name": "A- Nhóm tư vấn thương mại điện tử",
+      "memberCount": 131,
+      "hasAvatar": false
+    },
+    {
+      "id": "5956033487183875579",
+      "name": "Tâm Sự Adser Nhóm 2",
+      "memberCount": 588,
+      "hasAvatar": false
+    },
+    {
+      "id": "5625988364669364800",
+      "name": "Rút tiền tiktok",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "3134618093231037651",
+      "name": "Tool Reg Tik Tok & Tool Reg Gmail Bảo Sâm",
+      "memberCount": 864,
+      "hasAvatar": false
+    },
+    {
+      "id": "8234048323512385558",
+      "name": "Hưng Nguyên Báo Giá SR",
+      "memberCount": 892,
+      "hasAvatar": false
+    },
+    {
+      "id": "8371496425705123454",
+      "name": "Kiếm Tiền MMO FB Thực Chiến (thtmmo.com)",
+      "memberCount": 676,
+      "hasAvatar": false
+    },
+    {
+      "id": "3121674449256123905",
+      "name": "3D \u001dContent Animation with Duc",
+      "memberCount": 5,
+      "hasAvatar": false
+    },
+    {
+      "id": "7391147170985608129",
+      "name": "Nhóm đơn hàng - chị Hoa",
+      "memberCount": 1,
+      "hasAvatar": false
+    },
+    {
+      "id": "8395052488365703890",
+      "name": "YẾN ĐẢO MALAYSIA 2TF",
+      "memberCount": 76,
+      "hasAvatar": false
+    },
+    {
+      "id": "9031476110329928709",
+      "name": "Support ProxyNo.1",
+      "memberCount": 621,
+      "hasAvatar": false
+    },
+    {
+      "id": "7905397917735202790",
+      "name": "SocialAuto Pro Support",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "4096726550376682889",
+      "name": "❤ Xe Muộn",
+      "memberCount": 11,
+      "hasAvatar": false
+    },
+    {
+      "id": "3098739920932658259",
+      "name": "Bot MKT_Duyên",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "2360446990503581330",
+      "name": "[CMSNT] Changelog - Notification",
+      "memberCount": 918,
+      "hasAvatar": false
+    },
+    {
+      "id": "8981363235441684471",
+      "name": "Sửa tool 282",
+      "memberCount": 1,
+      "hasAvatar": false
+    },
+    {
+      "id": "472682820905500380",
+      "name": "Link sản phẩm dạng ảnh",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "5638242402064598636",
+      "name": "Visiov.Web.SEO",
+      "memberCount": 6,
+      "hasAvatar": false
+    },
+    {
+      "id": "8097393748917573644",
+      "name": "GB khóa YOUTUBE AI 2025",
+      "memberCount": 832,
+      "hasAvatar": false
+    },
+    {
+      "id": "7128279367008025023",
+      "name": "Tút Ngầm Facebook Ads",
+      "memberCount": 997,
+      "hasAvatar": false
+    },
+    {
+      "id": "1610969304923585032",
+      "name": "Group Check Live Via",
+      "memberCount": 6,
+      "hasAvatar": false
+    },
+    {
+      "id": "5492712030180999529",
+      "name": "Test thử hệ thống Phone Farm",
+      "memberCount": 101,
+      "hasAvatar": false
+    },
+    {
+      "id": "3249734118904775498",
+      "name": "Dak Nong Farm, Huy Thịnh, Lê Duy Đông",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "4335223890869903994",
+      "name": "Thuận Đỗ, Long, Dak Nong Farm",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "4968093889378337185",
+      "name": "Tune Shorts Pro - Cộng Đồng 2",
+      "memberCount": 205,
+      "hasAvatar": false
+    },
+    {
+      "id": "331568561600817866",
+      "name": "SEO Youtube bằng Phone Farm",
+      "memberCount": 142,
+      "hasAvatar": false
+    },
+    {
+      "id": "8794892167770800222",
+      "name": "Hội Viên Tín Dụng 05",
+      "memberCount": 991,
+      "hasAvatar": false
+    },
+    {
+      "id": "8798962156737401167",
+      "name": "Tự học code tool fb",
+      "memberCount": 5,
+      "hasAvatar": false
+    },
+    {
+      "id": "197529220602874094",
+      "name": "NGỌC VIỆT FRUIT_ SỈ _từ_3thùng ( Thái_Quận 7)",
+      "memberCount": 185,
+      "hasAvatar": false
+    },
+    {
+      "id": "1174128229102726168",
+      "name": "Nhóm Kín - Hội Thương lái Cà Chua Lâm Đồng",
+      "memberCount": 7,
+      "hasAvatar": false
+    },
+    {
+      "id": "7081085311860363286",
+      "name": "check api",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "2758849660237518874",
+      "name": "Edric Tool gói thuê tháng",
+      "memberCount": 660,
+      "hasAvatar": false
+    },
+    {
+      "id": "8936706617675550294",
+      "name": "undefined [TEST]",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "8277106442905541517",
+      "name": "Đặt hàng trung - hottrend - giá gốc - trực tiếp",
+      "memberCount": 97,
+      "hasAvatar": false
+    },
+    {
+      "id": "8490033691244384385",
+      "name": "SELLCLONEMMO - META FACEBOOK",
+      "memberCount": 747,
+      "hasAvatar": false
+    },
+    {
+      "id": "505376030885442384",
+      "name": "Mua gmail 2k",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "532482971454149424",
+      "name": "Dat HQ, Dak Nong Farm, Trang - Trợ Lý Dat Hq",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "2828373707975168019",
+      "name": "Visiov FB Group Preparation",
+      "memberCount": 6,
+      "hasAvatar": false
+    },
+    {
+      "id": "1721461409974191024",
+      "name": "Tool Ericson",
+      "memberCount": 4,
+      "hasAvatar": false
+    },
+    {
+      "id": "6251872657898758800",
+      "name": "LO - QTN",
+      "memberCount": 8,
+      "hasAvatar": false
+    },
+    {
+      "id": "8588562451484979299",
+      "name": "[3]HOME'S FARM NÔNG SẢN ĐÀ LẠT 0797725292",
+      "memberCount": 975,
+      "hasAvatar": false
+    },
+    {
+      "id": "7824206734290390726",
+      "name": "NGỌC TỔNG KHO HOA QUẢ VĨNH PHÚC",
+      "memberCount": 24,
+      "hasAvatar": false
+    },
+    {
+      "id": "4690646698188025419",
+      "name": "🚘 🚘 Xe Sớm Tân Phúc Hậu",
+      "memberCount": 58,
+      "hasAvatar": false
+    },
+    {
+      "id": "319550792754011196",
+      "name": "Hội bà con họ Đỗ 29.129",
+      "memberCount": 60,
+      "hasAvatar": false
+    },
+    {
+      "id": "6347997045439477579",
+      "name": "THUCOIN299.COM - THÔNG BÁO 🔔🔔🔔",
+      "memberCount": 597,
+      "hasAvatar": false
+    },
+    {
+      "id": "2772086443121060139",
+      "name": "máy-8",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "8213784857164807086",
+      "name": "HLProxy",
+      "memberCount": 1,
+      "hasAvatar": false
+    },
+    {
+      "id": "7949881381955979776",
+      "name": "SHOP BABYLOVE GIA LAI",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "5153669984412644822",
+      "name": "Phần Mềm Telesale - UPGO.IO",
+      "memberCount": 276,
+      "hasAvatar": false
+    },
+    {
+      "id": "6584718905866800434",
+      "name": "Lê Duy Đông, Dak Nong Farm, Hà Ngọc Tuấn",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "4906404759044760644",
+      "name": "2448 (rent D1,D3) Dak Nong Farm - Ryan",
+      "memberCount": 4,
+      "hasAvatar": false
+    },
+    {
+      "id": "6058226472477077568",
+      "name": "Cung Cấp Fanpage Ads Live ● Nhận Chạy Ads Live",
+      "memberCount": 448,
+      "hasAvatar": false
+    },
+    {
+      "id": "3645737360046251467",
+      "name": "CODE VISIONX",
+      "memberCount": 5,
+      "hasAvatar": false
+    },
+    {
+      "id": "3153766587510036631",
+      "name": "HTxDG",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "3566561709025802285",
+      "name": "Cộng Đồng MMO - CTV Affilate Svb.vn",
+      "memberCount": 935,
+      "hasAvatar": false
+    },
+    {
+      "id": "4538491451132818088",
+      "name": "TEAM BUS TDS",
+      "memberCount": 6,
+      "hasAvatar": false
+    },
+    {
+      "id": "5207714795947784726",
+      "name": "F5",
+      "memberCount": 5,
+      "hasAvatar": false
+    },
+    {
+      "id": "4788315463199704608",
+      "name": "SUPPORT - PROXYFB.COM 2",
+      "memberCount": 897,
+      "hasAvatar": false
+    },
+    {
+      "id": "4009594766596072695",
+      "name": "Giá Xoài 🍋 Na🌊Hàng Ngày (nhóm kín)",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "2098915211049912947",
+      "name": "🍎 XNK HÀNG HÓA",
+      "memberCount": 884,
+      "hasAvatar": false
+    },
+    {
+      "id": "8273818254403917697",
+      "name": "Dak Nong Farm, Nguyễn Anh Tuấn, Huy Thịnh",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "7402958021542096367",
+      "name": "zca-api",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "6483247334369154986",
+      "name": "B-Nhóm tư vấn truy xuất nguồn gốc itrace247",
+      "memberCount": 120,
+      "hasAvatar": false
+    },
+    {
+      "id": "3182891775735001208",
+      "name": "link sản phẩm",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "1747066057095663981",
+      "name": "Max Cloud Phone - Facebook",
+      "memberCount": 127,
+      "hasAvatar": false
+    },
+    {
+      "id": "5577005456698269494",
+      "name": "NDGroup VN 13 | Group Cộng Đồng Youtube Free",
+      "memberCount": 414,
+      "hasAvatar": false
+    },
+    {
+      "id": "9183882451865860896",
+      "name": "máy-8",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "6820587501832965876",
+      "name": "Giá Carot🌾Củ Cải Hàng Ngày (nhóm kín)",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "8108939010045448155",
+      "name": "Phương, Dak Nong Farm, Hùng",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "2805837981808206243",
+      "name": "Trần Văn Hợp, Dak Nong Farm",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "1044492939255875373",
+      "name": "OpenAI ChatGPT Việt Nam (Nhóm 2)",
+      "memberCount": 44,
+      "hasAvatar": false
+    },
+    {
+      "id": "1526811273479148131",
+      "name": "Hội Viên Tín Dụng 01",
+      "memberCount": 886,
+      "hasAvatar": false
+    },
+    {
+      "id": "2258648593414696971",
+      "name": "Đẩy-kênh-tiktok",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "7751307678055927489",
+      "name": "27. Nhóm Xnk Hàng Hoá",
+      "memberCount": 667,
+      "hasAvatar": false
+    },
+    {
+      "id": "2620792296059178253",
+      "name": "tool reg tiktok seller",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "6774280155203906128",
+      "name": "review phim",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "5626892844372602693",
+      "name": "Tool Youtube Tổng hợp. Chia sẻ key Youtube GMOD",
+      "memberCount": 969,
+      "hasAvatar": false
+    },
+    {
+      "id": "6653132524995575559",
+      "name": "Huy Thịnh, Văn Anh",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "6805666306964347681",
+      "name": "ADB team",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "8192111197940496099",
+      "name": "Vũ Duyên, Thành Đạt, Dak Nong Farm",
+      "memberCount": 1,
+      "hasAvatar": false
+    },
+    {
+      "id": "8713256430260413624",
+      "name": "03.25 广西科技大学",
+      "memberCount": 7,
+      "hasAvatar": false
+    },
+    {
+      "id": "7904851564120058336",
+      "name": "hcotp.com - NHÓM HỖ TRỢ AE ++",
+      "memberCount": 799,
+      "hasAvatar": false
+    },
+    {
+      "id": "2910010337257340209",
+      "name": "Nông Sản Lâm Viên",
+      "memberCount": 183,
+      "hasAvatar": false
+    },
+    {
+      "id": "2894235586756375929",
+      "name": "Máy-3",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "1221558104036611232",
+      "name": "Reg tiktok",
+      "memberCount": 4,
+      "hasAvatar": false
+    },
+    {
+      "id": "3032440497140615238",
+      "name": "SHOPTOOLHP.COM",
+      "memberCount": 985,
+      "hasAvatar": false
+    },
+    {
+      "id": "3462982219587209565",
+      "name": "Đăk nông Farm",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "2672699836560131396",
+      "name": "công ty HƯNG NGUYÊN báo giá hàng ngày",
+      "memberCount": 844,
+      "hasAvatar": false
+    },
+    {
+      "id": "8702556504341629590",
+      "name": "dak",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "291414495790004312",
+      "name": "máy-7",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "8651055100586492253",
+      "name": "CSKH - SHOPVPS.VN",
+      "memberCount": 268,
+      "hasAvatar": false
+    },
+    {
+      "id": "1230858015618789959",
+      "name": "2. BÌNH DÂN HỌC YOUTUBE FREE",
+      "memberCount": 994,
+      "hasAvatar": false
+    },
+    {
+      "id": "4514380637473042421",
+      "name": "mua_mail_1k2",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "756396765684171308",
+      "name": "BÁO GIÁ Sầu Riêng Tây Nguyên - HÒA 0906793671",
+      "memberCount": 353,
+      "hasAvatar": false
+    },
+    {
+      "id": "5648005256310052914",
+      "name": "VMB - Dặm - OTA",
+      "memberCount": 508,
+      "hasAvatar": false
+    },
+    {
+      "id": "8764490678191796210",
+      "name": "[CMSNT] Trao đổi API - Suppliers",
+      "memberCount": 686,
+      "hasAvatar": false
+    },
+    {
+      "id": "5171400654881846423",
+      "name": "Reup live Kiếm Tiền Tiktok",
+      "memberCount": 360,
+      "hasAvatar": false
+    },
+    {
+      "id": "7249862461891350479",
+      "name": "Tiktok shop QNT",
+      "memberCount": 6,
+      "hasAvatar": false
+    },
+    {
+      "id": "3798208757838018278",
+      "name": "Group Fb Ads TPCN",
+      "memberCount": 4,
+      "hasAvatar": false
+    },
+    {
+      "id": "1526832764013335139",
+      "name": "Huy Thịnh, Lê Hồ Bạch Tuyết",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "7460107320238741460",
+      "name": "Bách Hoá Tổng Hợp ChiNa Giá Rẻ❤️",
+      "memberCount": 136,
+      "hasAvatar": false
+    },
+    {
+      "id": "7831244000561870333",
+      "name": "Content_SEO_Web",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "7845880463443720625",
+      "name": "TOOL TIKTOK MMO",
+      "memberCount": 151,
+      "hasAvatar": false
+    },
+    {
+      "id": "189814779808667633",
+      "name": "Adbreaks.vn - Drama Official",
+      "memberCount": 1000,
+      "hasAvatar": false
+    },
+    {
+      "id": "4879089072563684069",
+      "name": "VẬN TẢI TOÀN QUỐC",
+      "memberCount": 15,
+      "hasAvatar": false
+    },
+    {
+      "id": "8625727559369503975",
+      "name": "TopProxy.vn (2) - Proxy Dân Cư Tĩnh Xoay",
+      "memberCount": 895,
+      "hasAvatar": false
+    },
+    {
+      "id": "8003776013053791040",
+      "name": "Cộng Đồng Tích Xanh Mạng Xã Hội",
+      "memberCount": 455,
+      "hasAvatar": false
+    },
+    {
+      "id": "2831475555302513432",
+      "name": "Hma Dak Nong",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "8755206617663934163",
+      "name": "BluSaigon - Chia sẻ kinh nghiệm vs Lark",
+      "memberCount": 4,
+      "hasAvatar": false
+    },
+    {
+      "id": "2797186911534682",
+      "name": "smmapir.com CUNG CẤP API MXH 2",
+      "memberCount": 945,
+      "hasAvatar": false
+    },
+    {
+      "id": "8082048038892220026",
+      "name": "NHÀ MÁY SẢN XUẤT SP ĐÔNG Y - GLOBAL PHARMACY",
+      "memberCount": 665,
+      "hasAvatar": false
+    },
+    {
+      "id": "5818398971303762156",
+      "name": "Kiếm tiền Maxtiktok Chrome & Min Network",
+      "memberCount": 453,
+      "hasAvatar": false
+    },
+    {
+      "id": "4469249652434422870",
+      "name": "Cty Tnhh Nguồn Sáng Tương Lai, Dak Nong Farm, ...",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "2276831208259481803",
+      "name": "Dak Nong Farm, Khả Ái, Huy Thịnh",
+      "memberCount": 3,
+      "hasAvatar": false
+    },
+    {
+      "id": "8390413925904446243",
+      "name": "Tìm Việc - Đắk Nông - 01",
+      "memberCount": 733,
+      "hasAvatar": false
+    },
+    {
+      "id": "1357943749343722891",
+      "name": "claim shorts",
+      "memberCount": 2,
+      "hasAvatar": false
+    },
+    {
+      "id": "1249574336776384772",
+      "name": "Gmail-regphone-3k-7days",
+      "memberCount": 3,
+      "hasAvatar": false
+    }
+  ],
+  "missing": [],
+  "anomalies": {
+    "noName": 0,
+    "noAvatar": 132,
+    "zeroMember": 0
+  }
+}
