@@ -29,6 +29,8 @@
     "send:image:son": "node scripts/send-image-cli.cjs --name=\"Văn Sơn\"",
     "send:tpl": "node scripts/send-template-cli.cjs",
     "send:tpl:son": "node scripts/send-template-cli.cjs --tpl=\"test\" --cat=personal --name=\"Văn Sơn\"",
+    "send:userid": "node scripts/send-by-userid-cli.cjs",
+    "test:debug": "node scripts/test-debug.js",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {

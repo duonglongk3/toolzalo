@@ -43,6 +43,8 @@ const electronAPI = {
     joinGroupLink: (link: string) => ipcRenderer.invoke('zalo-join-group-link', link),
     findUser: (phoneNumber: string) => ipcRenderer.invoke('zalo-find-user', phoneNumber),
     sendFriendRequest: (userId: string, message?: string) => ipcRenderer.invoke('zalo-send-friend-request', { userId, message }),
+    addUserToGroup: (groupId: string, userIds: string[]) => ipcRenderer.invoke('zalo-add-user-to-group', { groupId, userIds }),
+    testGroupsAdmin: () => ipcRenderer.invoke('zalo-test-groups-admin'),
 
     getAccountInfo: () => ipcRenderer.invoke('zalo-get-account-info'),
     getUserInfo: (userId: string | string[]) => ipcRenderer.invoke('zalo-get-user-info', userId),

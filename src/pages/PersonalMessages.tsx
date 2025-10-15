@@ -35,7 +35,10 @@ const PersonalMessages: React.FC = () => {
   const [sendMode, setSendMode] = React.useState<'normal' | 'forward'>('normal')
   // Nhập SĐT để gửi trực tiếp (resolve -> userId)
   const [phoneList, setPhoneList] = React.useState('')
+  const [userIdList, setUserIdList] = React.useState('')
   const [resolvingPhones, setResolvingPhones] = React.useState(false)
+  // Checkbox: Kết bạn trước khi gửi
+  const [addFriendBeforeSend, setAddFriendBeforeSend] = React.useState(false)
 
   // Labels state for selecting recipients by tags
   const [labels, setLabels] = React.useState<Array<{ id: number; text: string; conversations: string[] }>>([])
@@ -250,14 +253,46 @@ const PersonalMessages: React.FC = () => {
     return found
   }
 
+  // Parse và validate danh sách User ID
+  const parseUserIdList = (userIdsText: string): string[] => {
+    const lines = Array.from(new Set(
+      (userIdsText || '')
+        .split(/\r?\n|[,;\s]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .filter(id => /^\d+$/.test(id)) // Chỉ lấy những ID là số
+    ))
+    return lines
+  }
+
+  // Tính toán số lượng người nhận
+  const hasRecipients = React.useMemo(() => {
+    const hasSelectedFriends = selectedFriends.length > 0
+    const hasUserIds = userIdList.trim().length > 0
+    const hasPhones = phoneList.trim().length > 0
+    return hasSelectedFriends || hasUserIds || hasPhones
+  }, [selectedFriends.length, userIdList, phoneList])
+
+  // Thêm User ID trực tiếp vào danh sách người nhận
   const handleSendMessages = async () => {
     if (!selectedTemplate) {
       toast.error('Vui lòng chọn template')
       return
     }
 
-    if (selectedFriends.length === 0) {
-      toast.error('Vui lòng chọn người nhận')
+    // Tự động parse User ID từ textarea nếu có
+    const userIdsFromTextarea = parseUserIdList(userIdList)
+    const phoneIdsFromTextarea = phoneList.trim() ? await resolvePhonesToRecipients(phoneList) : []
+
+    // Tổng hợp tất cả recipients
+    const allRecipients = Array.from(new Set([
+      ...selectedFriends,
+      ...userIdsFromTextarea,
+      ...phoneIdsFromTextarea
+    ]))
+
+    if (allRecipients.length === 0) {
+      toast.error('Vui lòng chọn người nhận hoặc nhập User ID/số điện thoại')
       return
     }
 
@@ -283,14 +318,25 @@ const PersonalMessages: React.FC = () => {
       }
     }
 
+    // Lọc bỏ userId của chính mình (không thể tự gửi tin nhắn cho chính mình)
+    const currentUserId = zaloService.getCurrentUserId()
+    if (currentUserId) {
+      const beforeFilter = allRecipients.length
+      const filteredRecipients = allRecipients.filter(id => id !== currentUserId)
+      if (filteredRecipients.length < beforeFilter) {
+        toast.error('Không thể gửi tin nhắn cho chính mình')
+        return
+      }
+    }
+
     const jobId = Date.now().toString()
     const newJob: MessageJob = {
       id: jobId,
       templateId: selectedTemplate.id,
-      recipients: [...selectedFriends],
+      recipients: [...allRecipients],
       status: 'pending',
       sentCount: 0,
-      totalCount: selectedFriends.length,
+      totalCount: allRecipients.length,
       createdAt: new Date(),
       errors: [],
       mode: sendMode,
@@ -300,6 +346,8 @@ const PersonalMessages: React.FC = () => {
     setShowSendModal(false)
     setSelectedFriends([])
     setSelectedTemplate(null)
+    setUserIdList('') // Clear User ID list
+    setPhoneList('') // Clear phone list
 
     // Start sending messages
     await processMessageJob(newJob)
@@ -342,19 +390,32 @@ const PersonalMessages: React.FC = () => {
     }
 
 
-    for (const friendId of job.recipients) {
+    for (const recipientId of job.recipients) {
       try {
-        const friend = friends.find(f => f.id === friendId)
-
+        // Lấy template và friend info
         const template = templates.find(t => t.id === job.templateId)
         if (!template) {
-          errors.push('Template không tồn tại')
-          break
+          errors.push(`Template không tồn tại cho User ${recipientId}`)
+          continue
+        }
+        const friend = friends.find(f => f.id === recipientId)
+
+        // Kết bạn trước khi gửi (nếu được bật)
+        if (addFriendBeforeSend) {
+          try {
+            // API signature: sendFriendRequest(message, userId)
+            await zaloService.sendFriendRequest('', recipientId)
+            console.log('✅ Đã gửi lời mời kết bạn cho:', recipientId)
+            // Đợi 500ms để request được xử lý
+            await new Promise(r => setTimeout(r, 500))
+          } catch (e) {
+            // Bỏ qua lỗi kết bạn, vẫn tiếp tục gửi tin
+            console.warn('⚠️ Kết bạn thất bại, vẫn tiếp tục gửi tin:', e)
+          }
         }
 
-        // Replace variables trong template (fallback nếu thiếu info hoặc gửi ID không có trong friends)
         let message = template.content
-        const fallbackName = friend?.displayName || friend?.name || ''
+        const fallbackName = friend?.displayName || friend?.name || `User ${recipientId}`
         const fallbackPhone = friend?.phone || ''
         message = message.replace(/\{name\}/g, fallbackName)
         message = message.replace(/\{phone\}/g, fallbackPhone)
@@ -378,38 +439,49 @@ const PersonalMessages: React.FC = () => {
           if (attachmentsAll.length > 0) {
             // Forward mode nhưng có tệp -> gọi forwardMessage kèm attachments để main fallback gửi file
             console.log('🧪 forwardMode -> forwardMessage with attachments', attachmentsAll)
-            success = await zaloService.forwardMessage({ message, attachments: attachmentsAll }, [friend.id], 'user')
+            success = await zaloService.forwardMessage({ message, attachments: attachmentsAll }, [recipientId], 'user')
             if (!success) {
               // Fallback cuối cùng: thử sendMessage như gửi thường
-              success = await zaloService.sendMessage(friend.id, message, 'user', attachmentsAll)
-              if (!success) success = await zaloService.sendMessage(friend.id, message, 'user')
+              success = await zaloService.sendMessage(recipientId, message, 'user', attachmentsAll)
+              if (!success) success = await zaloService.sendMessage(recipientId, message, 'user')
             }
           } else {
-            success = await zaloService.forwardMessage({ message }, [friend.id], 'user')
+            success = await zaloService.forwardMessage({ message }, [recipientId], 'user')
           }
         } else {
           // Bình thường: ưu tiên file đính kèm -> video URL -> link -> văn bản
           console.log('🧪 personal.attachmentsAll', attachmentsAll)
+
+          // Kiểm tra xem có phải bạn bè không
+          const isFriend = !!friend
+
           if (attachmentsAll.length > 0) {
-            success = await zaloService.sendMessage(friend.id, message, 'user', attachmentsAll)
-            if (!success) success = await zaloService.sendMessage(friend.id, message, 'user')
+            // Thử gửi với attachments
+            success = await zaloService.sendMessage(recipientId, message, 'user', attachmentsAll)
+
+            // Nếu thất bại, thử gửi chỉ text (không có attachments)
+            if (!success) {
+              console.warn('⚠️ Gửi file thất bại, thử gửi chỉ text...')
+              success = await zaloService.sendMessage(recipientId, message, 'user')
+            }
           } else if (videoUrl) {
-            success = await zaloService.sendVideo(friend.id, videoUrl, videoUrl, { msg: message }, 'user')
-            if (!success) success = await zaloService.sendMessage(friend.id, message, 'user')
+            success = await zaloService.sendVideo(recipientId, videoUrl, videoUrl, { msg: message }, 'user')
+            if (!success) success = await zaloService.sendMessage(recipientId, message, 'user')
           } else if (urlMatch) {
             const link = urlMatch[0]
             const msgWithoutLink = message.replace(link, '').trim()
-            success = await zaloService.sendLink(friend.id, link, msgWithoutLink || undefined, 'user')
-            if (!success) success = await zaloService.sendMessage(friend.id, message, 'user')
+            success = await zaloService.sendLink(recipientId, link, msgWithoutLink || undefined, 'user')
+            if (!success) success = await zaloService.sendMessage(recipientId, message, 'user')
           } else {
-            success = await zaloService.sendMessage(friend.id, message, 'user')
+            success = await zaloService.sendMessage(recipientId, message, 'user')
           }
         }
 
         if (success) {
           sentCount++
         } else {
-          errors.push(`Gửi thất bại cho ${friend.name}`)
+          const recipientName = friend?.name || friend?.displayName || `User ${recipientId}`
+          errors.push(`Gửi thất bại cho ${recipientName}`)
         }
 
         // Update progress
@@ -424,7 +496,8 @@ const PersonalMessages: React.FC = () => {
 
       } catch (error) {
         console.error('Send message error:', error)
-        errors.push(`Lỗi gửi tin cho ${friendId}: ${error}`)
+        const recipientName = friends.find(f => f.id === recipientId)?.name || `User ${recipientId}`
+        errors.push(`Lỗi gửi tin cho ${recipientName}: ${error}`)
       }
     }
 
@@ -772,8 +845,23 @@ const PersonalMessages: React.FC = () => {
             </div>
           )}
 
-          {/* Recipients Selection - 3 columns */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Total Recipients Summary */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">Tổng số người nhận</h3>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  {selectedFriends.length} bạn bè + {parseUserIdList(userIdList).length} User ID + {phoneList.trim().split(/\r?\n|[,;\s]+/).filter(Boolean).length} số điện thoại
+                </p>
+              </div>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {Array.from(new Set([...selectedFriends, ...parseUserIdList(userIdList)])).length + phoneList.trim().split(/\r?\n|[,;\s]+/).filter(Boolean).length}
+              </div>
+            </div>
+          </div>
+
+          {/* Recipients Selection - 4 columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             {/* Column 1: Select by Labels */}
             <div>
               <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
@@ -818,10 +906,23 @@ const PersonalMessages: React.FC = () => {
 
             {/* Column 2: Select Recipients */}
             <div>
-              <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
-                Chọn người nhận ({selectedFriends.length}/{friends.length})
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-secondary-700 dark:text-secondary-300">
+                  Danh sách người nhận ({selectedFriends.length})
+                </label>
+                {selectedFriends.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedFriends([])}
+                    className="text-xs px-2 py-1 h-6"
+                  >
+                    Xóa tất cả
+                  </Button>
+                )}
+              </div>
               <div className="max-h-64 overflow-y-auto border border-secondary-300 dark:border-secondary-600 rounded-lg bg-white dark:bg-secondary-800">
+                {/* Hiển thị bạn bè */}
                 {friends.map(friend => (
                   <label key={friend.id} className="flex items-center p-2 hover:bg-secondary-50 dark:hover:bg-secondary-700 cursor-pointer">
                     <input
@@ -844,25 +945,51 @@ const PersonalMessages: React.FC = () => {
                     </span>
                   </label>
                 ))}
+
+                {/* Hiển thị User ID không có trong danh sách bạn bè */}
+                {selectedFriends
+                  .filter(id => !friends.some(f => f.id === id))
+                  .map(userId => (
+                    <div key={userId} className="flex items-center p-2 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-400">
+                      <button
+                        onClick={() => setSelectedFriends(prev => prev.filter(id => id !== userId))}
+                        className="mr-2 w-4 h-4 text-red-500 hover:text-red-700 flex items-center justify-center"
+                        title="Xóa khỏi danh sách"
+                      >
+                        ×
+                      </button>
+                      <span className="text-sm text-blue-900 dark:text-blue-100">
+                        User ID: {userId}
+                        <span className="text-blue-600 dark:text-blue-400 ml-1 text-xs">(từ danh sách)</span>
+                      </span>
+                    </div>
+                  ))
+                }
+
+                {selectedFriends.length === 0 && (
+                  <div className="p-4 text-center text-secondary-500 dark:text-secondary-400 text-sm">
+                    Chưa chọn người nhận nào
+                  </div>
+                )}
               </div>
               <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1">
-                Điều chỉnh thủ công danh sách người nhận
+                Bạn bè + User ID từ số điện thoại/danh sách
               </p>
             </div>
 
             {/* Column 3: Phone numbers */}
             <div>
               <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
-                Danh sách số điện thoại (mỗi dòng 1 số)
+                Danh sách số điện thoại
               </label>
               <textarea
                 value={phoneList}
                 onChange={(e) => setPhoneList(e.target.value)}
                 placeholder="VD:\n0987654321\n0912345678\n..."
-                rows={12}
+                rows={10}
                 className="w-full px-3 py-2 border border-secondary-300 dark:border-secondary-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-100"
               />
-              <div className="flex items-center justify-between mt-2">
+              <div className="flex flex-col gap-2 mt-2">
                 <p className="text-xs text-secondary-500 dark:text-secondary-400">
                   Hệ thống sẽ dò userId từ số điện thoại rồi thêm vào danh sách người nhận.
                 </p>
@@ -877,9 +1004,32 @@ const PersonalMessages: React.FC = () => {
                     }
                   }}
                   loading={resolvingPhones}
+                  className="w-full"
                 >
                   Thêm từ số điện thoại
                 </Button>
+              </div>
+            </div>
+
+            {/* Column 4: User IDs */}
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
+                Danh sách User ID
+              </label>
+              <textarea
+                value={userIdList}
+                onChange={(e) => setUserIdList(e.target.value)}
+                placeholder="VD:\n1234567890123456\n9876543210987654\n..."
+                rows={10}
+                className="w-full px-3 py-2 border border-secondary-300 dark:border-secondary-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-100"
+              />
+              <div className="text-xs text-secondary-500 dark:text-secondary-400 space-y-1 mt-2">
+                <p>• Nhập trực tiếp User ID (chỉ số), mỗi dòng một ID</p>
+                <p>• User ID thường dài 10-16 chữ số</p>
+                <p>• Có thể copy từ tính năng "Xem thành viên" của nhóm</p>
+                <p className="text-green-600 dark:text-green-400 font-medium">
+                  ✨ Tự động gửi - Nhấn "Gửi tin nhắn" để gửi thẳng
+                </p>
               </div>
             </div>
           </div>
@@ -910,7 +1060,29 @@ const PersonalMessages: React.FC = () => {
                 step={1}
               />
             </div>
+
+          {/* Checkbox: Kết bạn trước khi gửi */}
+          <div className="col-span-full">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={addFriendBeforeSend}
+                onChange={(e) => setAddFriendBeforeSend(e.target.checked)}
+                className="w-4 h-4 text-primary-600 bg-white dark:bg-secondary-700 border-secondary-300 dark:border-secondary-600 rounded focus:ring-primary-500 focus:ring-2"
+              />
+              <div>
+                <span className="text-sm font-medium text-secondary-900 dark:text-secondary-100">
+                  Kết bạn trước khi gửi tin nhắn
+                </span>
+                <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-0.5">
+                  Tự động gửi lời mời kết bạn trước khi gửi tin nhắn (bỏ qua nếu đã là bạn bè)
+                </p>
+              </div>
+            </label>
           </div>
+
+          </div>
+
 
           <div className="flex items-center justify-end space-x-3">
             <Button
@@ -921,7 +1093,7 @@ const PersonalMessages: React.FC = () => {
             </Button>
             <Button
               onClick={handleSendMessages}
-              disabled={!selectedTemplate || selectedFriends.length === 0}
+              disabled={!selectedTemplate || !hasRecipients}
             >
               Gửi tin nhắn
             </Button>

@@ -10,6 +10,8 @@ import PersonalMessages from '@/pages/PersonalMessages'
 import Groups from '@/pages/Groups'
 import GroupMessages from '@/pages/GroupMessages'
 import Settings from '@/pages/Settings'
+import TestAddUser from '@/pages/TestAddUser'
+import TestAdminGroups from '@/pages/TestAdminGroups'
 
 // Loading component
 const PageLoader: React.FC = () => {
@@ -78,6 +80,14 @@ const App: React.FC = () => {
             <Route
               path="settings"
               element={<Settings />}
+            />
+            <Route
+              path="test-add-user"
+              element={<TestAddUser />}
+            />
+            <Route
+              path="test-admin"
+              element={<TestAdminGroups />}
             />
             {/* Redirect unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/" replace />} />

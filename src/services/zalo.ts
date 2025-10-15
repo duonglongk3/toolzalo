@@ -12,7 +12,7 @@ const getElectronAPI = () => {
 class ZaloService {
   private readonly electronAPI: any = null
   private loggedIn = false
-
+  private currentUserId: string | null = null
 
   constructor() {
     this.electronAPI = getElectronAPI()
@@ -27,6 +27,13 @@ class ZaloService {
 
       const result = await this.electronAPI.zalo.login(credentials)
       this.loggedIn = !!result?.success
+
+      // Lưu current user ID để xác định admin
+      if (result?.success && result?.uid) {
+        this.currentUserId = result.uid
+        console.log('🔥 Current user ID from login result:', this.currentUserId)
+      }
+
       return this.loggedIn
     } catch (error) {
       console.error('🔥 Zalo login error:', error)
@@ -57,11 +64,16 @@ class ZaloService {
       console.error('Logout error:', error)
     } finally {
       this.loggedIn = false
+      this.currentUserId = null // Reset current user ID
     }
   }
 
   isLoggedIn(): boolean {
     return this.loggedIn
+  }
+
+  getCurrentUserId(): string | null {
+    return this.currentUserId
   }
 
   async refreshLoginState(): Promise<boolean> {
@@ -117,7 +129,8 @@ class ZaloService {
         console.warn('findUser did not return uid for phone:', phone)
         return false
       }
-      const res = await this.electronAPI.zalo.sendFriendRequest(uid, '')
+      // API signature: sendFriendRequest(message, userId)
+      const res = await this.electronAPI.zalo.sendFriendRequest('', uid)
       return !!res?.success
     } catch (error) {
       console.error('Add friend error:', error)
@@ -139,10 +152,11 @@ class ZaloService {
     }
   }
 
-  async sendFriendRequest(userId: string, message: string = ''): Promise<{ success: boolean; code?: number; error?: string }> {
+  async sendFriendRequest(message: string, userId: string): Promise<{ success: boolean; code?: number; error?: string }> {
     try {
       if (!this.electronAPI?.zalo) throw new Error('Electron Zalo API not available')
-      const res = await this.electronAPI.zalo.sendFriendRequest(userId, message)
+      // Electron API expects (message, userId) to match zca-js signature
+      const res = await this.electronAPI.zalo.sendFriendRequest(message, userId)
       if (res?.success) return { success: true }
       return { success: false, code: res?.code, error: res?.error }
     } catch (error: any) {
@@ -181,7 +195,7 @@ class ZaloService {
     const totalSend = idList.length
     let sendIndex = 0
     for (const uid of idList) {
-      const r = await this.sendFriendRequest(uid, message)
+      const r = await this.sendFriendRequest(message, uid)
       if (r.success) { details.push({ target: uid, status: 'sent' }); sent++ }
       else if (r.code === 225 || r.code === 222) { details.push({ target: uid, status: 'already', code: r.code }); already++ }
       else { details.push({ target: uid, status: 'failed', code: r.code, error: r.error }); failed++ }
@@ -553,6 +567,169 @@ class ZaloService {
     }
   }
 
+  // Add users to group with batch processing and delay
+  async addUserToGroup(groupId: string, userIds: string[]): Promise<{ success: boolean; errorMembers?: string[]; error?: string }> {
+    try {
+      if (!this.electronAPI?.zalo) throw new Error('Electron Zalo API not available')
+      if (!groupId || !Array.isArray(userIds) || userIds.length === 0) {
+        return { success: false, error: 'Invalid parameters' }
+      }
+
+      // If only 1-3 users, add directly without delay
+      if (userIds.length <= 3) {
+        const result = await this.electronAPI.zalo.addUserToGroup(groupId, userIds)
+        if (!result?.success) {
+          return { success: false, error: result?.error || 'Failed to add users to group', errorMembers: result?.errorMembers }
+        }
+        return { success: true, errorMembers: result.errorMembers }
+      }
+
+      // For many users, process in batches with delay
+      const batchSize = 5 // Add max 5 users per batch
+      const delayBetweenBatches = 1000 // 1 second delay between batches
+      const allErrorMembers: string[] = []
+      let hasSuccess = false
+
+      console.log(`🔄 Adding ${userIds.length} users to group in batches of ${batchSize}...`)
+
+      for (let i = 0; i < userIds.length; i += batchSize) {
+        const batch = userIds.slice(i, i + batchSize)
+        const batchNumber = Math.floor(i / batchSize) + 1
+        const totalBatches = Math.ceil(userIds.length / batchSize)
+
+        console.log(`📦 Processing batch ${batchNumber}/${totalBatches}: ${batch.length} users`)
+
+        try {
+          const result = await this.electronAPI.zalo.addUserToGroup(groupId, batch)
+
+          if (result?.success) {
+            hasSuccess = true
+            if (result.errorMembers && result.errorMembers.length > 0) {
+              allErrorMembers.push(...result.errorMembers)
+              console.log(`⚠️ Batch ${batchNumber}: ${batch.length - result.errorMembers.length}/${batch.length} users added successfully`)
+            } else {
+              console.log(`✅ Batch ${batchNumber}: All ${batch.length} users added successfully`)
+            }
+          } else {
+            console.log(`❌ Batch ${batchNumber}: Failed - ${result?.error || 'Unknown error'}`)
+            allErrorMembers.push(...batch) // All users in this batch failed
+          }
+        } catch (error) {
+          console.error(`❌ Batch ${batchNumber} exception:`, error)
+          allErrorMembers.push(...batch) // All users in this batch failed
+        }
+
+        // Add delay between batches (except for the last batch)
+        if (i + batchSize < userIds.length) {
+          console.log(`⏳ Waiting ${delayBetweenBatches}ms before next batch...`)
+          await new Promise(r => setTimeout(r, delayBetweenBatches))
+        }
+      }
+
+      const successCount = userIds.length - allErrorMembers.length
+      console.log(`🎯 Final result: ${successCount}/${userIds.length} users added successfully`)
+
+      return {
+        success: hasSuccess,
+        errorMembers: allErrorMembers.length > 0 ? allErrorMembers : undefined
+      }
+    } catch (error) {
+      console.error('addUserToGroup exception:', error)
+      return { success: false, error: String(error) }
+    }
+  }
+
+  async addUsersToGroupByPhones(groupId: string, phoneNumbers: string[]): Promise<{ success: boolean; added: number; failed: number; details: Array<{ phone: string; userId?: string; status: 'added' | 'failed'; error?: string }> }> {
+    const details: Array<{ phone: string; userId?: string; status: 'added' | 'failed'; error?: string }> = []
+    let added = 0
+    let failed = 0
+
+    try {
+      if (!groupId || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+        return { success: false, added: 0, failed: 0, details: [] }
+      }
+
+      // Step 1: Resolve phone numbers to user IDs with progressive delay
+      const userIds: string[] = []
+      const totalPhones = phoneNumbers.length
+
+      console.log(`🔍 Resolving ${totalPhones} phone numbers to user IDs...`)
+
+      for (let i = 0; i < phoneNumbers.length; i++) {
+        const phone = phoneNumbers[i]
+        const cleanPhone = (phone || '').trim()
+
+        if (!cleanPhone) {
+          details.push({ phone: cleanPhone, status: 'failed', error: 'Empty phone number' })
+          failed++
+          continue
+        }
+
+        console.log(`📞 Resolving ${i + 1}/${totalPhones}: ${cleanPhone}`)
+
+        try {
+          const { userId } = await this.findUser(cleanPhone)
+          if (userId) {
+            userIds.push(userId)
+            details.push({ phone: cleanPhone, userId, status: 'added' })
+            console.log(`✅ Found user: ${cleanPhone} → ${userId}`)
+          } else {
+            details.push({ phone: cleanPhone, status: 'failed', error: 'User not found' })
+            failed++
+            console.log(`❌ User not found: ${cleanPhone}`)
+          }
+        } catch (error) {
+          details.push({ phone: cleanPhone, status: 'failed', error: String(error) })
+          failed++
+          console.log(`❌ Error resolving ${cleanPhone}:`, error)
+        }
+
+        // Progressive delay: longer delay for more phones to avoid rate limiting
+        const baseDelay = 300
+        const progressiveDelay = totalPhones > 10 ? Math.min(1000, baseDelay + (i * 50)) : baseDelay
+
+        if (i < phoneNumbers.length - 1) { // Don't delay after the last phone
+          console.log(`⏳ Waiting ${progressiveDelay}ms before next phone...`)
+          await new Promise(r => setTimeout(r, progressiveDelay))
+        }
+      }
+
+      // Step 2: Add users to group if we have valid user IDs
+      if (userIds.length > 0) {
+        const result = await this.addUserToGroup(groupId, userIds)
+        if (result.success) {
+          added = userIds.length - (result.errorMembers?.length || 0)
+          // Update details for failed additions
+          if (result.errorMembers && result.errorMembers.length > 0) {
+            for (const detail of details) {
+              if (detail.userId && result.errorMembers.includes(detail.userId)) {
+                detail.status = 'failed'
+                detail.error = 'Failed to add to group'
+                failed++
+                added--
+              }
+            }
+          }
+        } else {
+          // All additions failed
+          for (const detail of details) {
+            if (detail.status === 'added') {
+              detail.status = 'failed'
+              detail.error = result.error || 'Failed to add to group'
+              failed++
+            }
+          }
+          added = 0
+        }
+      }
+
+      return { success: added > 0, added, failed, details }
+    } catch (error) {
+      console.error('addUsersToGroupByPhones exception:', error)
+      return { success: false, added: 0, failed: phoneNumbers.length, details: phoneNumbers.map(phone => ({ phone, status: 'failed' as const, error: String(error) })) }
+    }
+  }
+
   // Message listener (would need special handling in Electron)
   startMessageListener(_onMessage: (message: any) => void): void {
     console.warn('startMessageListener not implemented yet')
@@ -590,11 +767,36 @@ export async function fetchGroupInfo(groupId: string): Promise<Partial<ZaloGroup
     else key = keys.find(k => k === w || k === wBase || k.split('_')[0] === w || k.split('_')[0] === wBase) || keys.find(k => k.includes(w) || k.includes(wBase)) || null
     const gi: any = key ? map[key] : undefined
     if (!gi) return null
+
+    // Xác định isAdmin dựa trên adminIds HOẶC creatorId
+    const currentUserId = zaloService.getCurrentUserId()
+    const adminIds: string[] = gi.adminIds || []
+    const creatorId: string = gi.creatorId || ''
+
+    // Bạn là admin nếu:
+    // 1. Có trong danh sách adminIds, HOẶC
+    // 2. Là người tạo nhóm (creatorId)
+    const isAdminByIds = currentUserId ? adminIds.includes(currentUserId) : false
+    const isCreator = currentUserId ? creatorId === currentUserId : false
+    const isAdmin = isAdminByIds || isCreator
+
+    // Debug log chi tiết
+    if (isAdmin || adminIds.length > 0) {
+      console.log(`🔥 Group ${groupId}: ${gi.name || 'Unknown'}`)
+      console.log(`   - currentUserId: "${currentUserId}"`)
+      console.log(`   - creatorId: "${creatorId}"`)
+      console.log(`   - adminIds: [${adminIds.map(id => `"${id}"`).join(', ')}]`)
+      console.log(`   - isCreator: ${isCreator}`)
+      console.log(`   - isAdminByIds: ${isAdminByIds}`)
+      console.log(`   - isAdmin (final): ${isAdmin}`)
+    }
+
     return {
       name: gi.name || undefined,
       description: gi.desc || undefined,
       avatar: gi.avt || gi.fullAvt || undefined,
       memberCount: gi.totalMember || gi.membersCount || undefined,
+      isAdmin,
     }
   } catch (error) {
     console.error('fetchGroupInfo exception:', error)
@@ -641,15 +843,26 @@ export async function fetchGroupInfos(groupIds: string[]): Promise<Record<string
       return k2 || null
     }
 
+    // Lấy current user ID để xác định admin
+    const currentUserId = zaloService.getCurrentUserId()
+
     for (const id of ids) {
       const key = findKeyFor(String(id))
       const gi: any = key ? rawMap[key] : undefined
       if (!gi) continue
+
+      // Xác định isAdmin dựa trên adminIds
+      const adminIds: string[] = gi.adminIds || []
+      const isAdmin = currentUserId ? adminIds.includes(currentUserId) : false
+
+      console.log(`🔥 Batch Group ${id}: currentUserId=${currentUserId}, adminIds=[${adminIds.join(',')}], isAdmin=${isAdmin}`)
+
       out[id] = {
         name: gi.name || undefined,
         description: gi.desc || undefined,
         avatar: gi.avt || gi.fullAvt || undefined,
         memberCount: gi.totalMember || gi.membersCount || undefined,
+        isAdmin,
       }
     }
   } catch (error) {

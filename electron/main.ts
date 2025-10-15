@@ -496,7 +496,211 @@ ipcMain.handle('zalo-send-friend-request', async (_event, payload: { userId: str
   }
 })
 
+// Add users to group
+ipcMain.handle('zalo-add-user-to-group', async (_event, payload: { groupId: string; userIds: string[] }) => {
+  try {
+    if (!zaloAPI) return { success: false, error: 'Not logged in' }
+    const { groupId, userIds } = payload || ({} as any)
 
+    if (!groupId || typeof groupId !== 'string') {
+      return { success: false, error: 'Missing groupId' }
+    }
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return { success: false, error: 'Missing or empty userIds array' }
+    }
+
+    // Clean and validate user IDs
+    const cleanUserIds = userIds
+      .map(id => String(id || '').trim())
+      .filter(Boolean)
+
+    if (cleanUserIds.length === 0) {
+      return { success: false, error: 'No valid user IDs provided' }
+    }
+
+    const api: any = zaloAPI as any
+
+    // Strategy 1: Try addUserToGroup (requires admin/creator permission)
+    if (typeof api.addUserToGroup === 'function') {
+      try {
+        console.log(`🔧 Trying addUserToGroup for ${cleanUserIds.length} users to group ${groupId}`)
+        const result = await api.addUserToGroup(cleanUserIds, groupId)
+
+        console.log('✅ addUserToGroup result:', {
+          errorMembers: result?.errorMembers?.length || 0,
+          total: cleanUserIds.length,
+          error_data: result?.error_data
+        })
+
+        // Check for error code 188 (not friends) or 269 (stranger in invite list)
+        const error188Users: string[] = result?.error_data?.['188'] || []
+        const error269Users: string[] = result?.error_data?.['269'] || []
+        const notFriendUsers = [...error188Users, ...error269Users]
+
+        // If some users succeeded
+        if (!result?.errorMembers || result.errorMembers.length < cleanUserIds.length) {
+          return {
+            success: true,
+            errorMembers: result?.errorMembers || [],
+            error_data: result?.error_data || {},
+            notFriendUsers: notFriendUsers.length > 0 ? notFriendUsers : undefined
+          }
+        }
+
+        // If all failed due to "not friends", return specific error
+        if (notFriendUsers.length === cleanUserIds.length) {
+          console.log('⚠️ All users failed because they are not friends')
+          return {
+            success: false,
+            errorMembers: result?.errorMembers || [],
+            error_data: result?.error_data || {},
+            notFriendUsers,
+            error: 'Cần kết bạn trước khi thêm vào nhóm'
+          }
+        }
+
+        // If all failed for other reasons, try fallback
+        console.log('⚠️ All users failed with addUserToGroup, trying inviteUserToGroups fallback...')
+      } catch (addError: any) {
+        console.log('⚠️ addUserToGroup failed:', addError?.message || String(addError))
+        console.log('Trying inviteUserToGroups fallback...')
+      }
+    }
+
+    // Strategy 2: Fallback to inviteUserToGroups (works for non-admin members)
+    if (typeof api.inviteUserToGroups === 'function') {
+      console.log(`🔧 Using inviteUserToGroups fallback for ${cleanUserIds.length} users`)
+
+      const errorMembers: string[] = []
+      const successMembers: string[] = []
+
+      // inviteUserToGroups signature: (userId, groupId)
+      // Can only invite ONE user at a time
+      for (const userId of cleanUserIds) {
+        try {
+          const result = await api.inviteUserToGroups(userId, groupId)
+
+          // Check if invitation was successful
+          const gridMessageMap = result?.grid_message_map || {}
+          const groupResult = gridMessageMap[groupId]
+
+          if (groupResult?.error_code === 0 || groupResult?.data) {
+            successMembers.push(userId)
+            console.log(`✅ Invited user ${userId} successfully`)
+          } else {
+            errorMembers.push(userId)
+            console.log(`❌ Failed to invite user ${userId}:`, groupResult?.error_message || 'Unknown error')
+          }
+        } catch (inviteError: any) {
+          errorMembers.push(userId)
+          console.log(`❌ Exception inviting user ${userId}:`, inviteError?.message || String(inviteError))
+        }
+
+        // Small delay between invitations to avoid rate limiting
+        if (cleanUserIds.length > 1) {
+          await new Promise(r => setTimeout(r, 300))
+        }
+      }
+
+      console.log(`🎯 inviteUserToGroups result: ${successMembers.length} success, ${errorMembers.length} failed`)
+
+      return {
+        success: successMembers.length > 0,
+        errorMembers: errorMembers.length > 0 ? errorMembers : undefined,
+        method: 'invite' // Indicate which method was used
+      }
+    }
+
+    // No method available
+    return { success: false, error: 'No add/invite method available' }
+  } catch (error: any) {
+    console.error('Add user to group error:', error)
+    const msg = error?.message || String(error)
+    return { success: false, error: msg }
+  }
+})
+
+// Test handler để debug groups admin
+ipcMain.handle('zalo-test-groups-admin', async () => {
+  try {
+    if (!zaloAPI) {
+      return { success: false, error: 'Not logged in' }
+    }
+
+    console.log('🔥 Testing groups admin status...')
+
+    // Lấy current user ID từ context thay vì fetchAccountInfo
+    const currentUserId = zaloAPI.listener?.ctx?.uid
+    console.log('👤 Current user ID from context:', currentUserId)
+
+    // Lấy thông tin tài khoản (có thể undefined)
+    const accountInfo = await zaloAPI.fetchAccountInfo()
+    console.log('👤 Account info:', {
+      uid: accountInfo?.uid,
+      displayName: accountInfo?.displayName,
+      zaloName: accountInfo?.zaloName
+    })
+
+    // Lấy danh sách nhóm
+    const allGroups = await zaloAPI.getAllGroups()
+    const groupIds = Object.keys(allGroups.gridVerMap || {})
+    console.log('📊 Total groups:', groupIds.length)
+
+    if (groupIds.length === 0) {
+      return { success: true, adminCount: 0, totalGroups: 0, message: 'No groups found' }
+    }
+
+    // Test với 10 nhóm đầu tiên
+    const testGroupIds = groupIds.slice(0, 10)
+    const groupInfo = await zaloAPI.getGroupInfo(testGroupIds)
+
+    let adminCount = 0
+    // Sử dụng currentUserId từ context thay vì accountInfo.uid
+    const results = []
+
+    if (groupInfo && groupInfo.gridInfoMap) {
+      for (const [groupId, info] of Object.entries(groupInfo.gridInfoMap)) {
+        const groupData = info as any
+        const adminIds = groupData.adminIds || []
+        const isAdmin = adminIds.includes(currentUserId)
+
+        console.log(`📝 Group: ${groupData.name || 'Unknown'}`)
+        console.log(`   - ID: ${groupId}`)
+        console.log(`   - Admin IDs: [${adminIds.join(', ')}]`)
+        console.log(`   - Current User ID: ${currentUserId}`)
+        console.log(`   - Is Admin: ${isAdmin}`)
+        console.log('   ---')
+
+        results.push({
+          id: groupId,
+          name: groupData.name || 'Unknown',
+          adminIds,
+          isAdmin,
+          memberCount: groupData.totalMember || 0
+        })
+
+        if (isAdmin) {
+          adminCount++
+        }
+      }
+    }
+
+    console.log(`🎯 RESULT: Admin in ${adminCount} out of ${testGroupIds.length} tested groups`)
+
+    return {
+      success: true,
+      adminCount,
+      totalGroups: groupIds.length,
+      testedGroups: testGroupIds.length,
+      currentUserId,
+      results
+    }
+  } catch (error) {
+    console.error('Test groups admin error:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
 
 // Leave group
 ipcMain.handle('zalo-leave-group', async (_event, groupId: string, silent: boolean = false) => {
@@ -553,10 +757,17 @@ ipcMain.handle('zalo-send-message', async (_event, payload: { threadId: string; 
     if (!zaloAPI) {
       return { success: false, error: 'Not logged in' }
     }
-    const { threadId, message, threadType = 'user', attachments } = payload || ({} as any)
+    let { threadId, message, threadType = 'user', attachments } = payload || ({} as any)
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0
     try { console.log('📥 ipc zalo-send-message recv', { threadId, threadType, msgLen: (message||'').length, att: hasAttachments ? attachments.length : 0, firstAtt: hasAttachments ? attachments[0] : undefined }) } catch {}
     if (!threadId || (!message && !hasAttachments)) return { success: false, error: 'Invalid params' }
+
+    // Normalize threadId: loại bỏ ký tự không phải số, giữ nguyên base ID
+    const rawThreadId = String(threadId).trim()
+    threadId = rawThreadId.replace(/[^\d]/g, '')
+    if (threadId !== rawThreadId) {
+      console.log('🔧 Normalized threadId:', rawThreadId, '->', threadId)
+    }
 
     const typeNum = threadType === 'group' ? 1 : 0
 
@@ -627,12 +838,30 @@ ipcMain.handle('zalo-send-message', async (_event, payload: { threadId: string; 
         break
       } catch (e) {
         lastError = e
+        const errMsg = e instanceof Error ? e.message : String(e)
+        console.warn('⚠️ sendMessage attempt failed:', errMsg)
         continue
       }
     }
 
     if (!ok) {
-      return { success: false, error: lastError instanceof Error ? lastError.message : (lastError ? String(lastError) : 'Send API not available in current zca-js version') }
+      const errorMessage = lastError instanceof Error ? lastError.message : (lastError ? String(lastError) : 'Send API not available in current zca-js version')
+      console.error('❌ All sendMessage attempts failed:', errorMessage)
+
+      // Nếu có attachments và tất cả đều thất bại, thử lại không có attachments
+      if (msgObj.attachments && msgObj.attachments.length > 0) {
+        console.log('🔄 Retrying without attachments...')
+        try {
+          const msgWithoutAtt = { msg: typeof message === 'string' ? message : (msgObj.msg || '') }
+          await (zaloAPI as any).sendMessage(msgWithoutAtt, threadId, typeNum)
+          console.log('✅ Sent successfully without attachments')
+          return { success: true, warning: 'Sent without attachments due to API limitation' }
+        } catch (retryError) {
+          console.error('❌ Retry without attachments also failed:', retryError)
+        }
+      }
+
+      return { success: false, error: errorMessage }
     }
 
     return { success: true }
