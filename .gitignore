@@ -128,6 +128,9 @@ dist
 
 # Electron build output
 release/
+release-build/
+dist-release/
+build-output/
 dist/
 
 # IDE files
@@ -154,3 +157,14 @@ tmp/
 # Build artifacts
 *.tgz
 *.tar.gz
+
+# Database files (contains user data)
+*.db
+*.db-shm
+*.db-wal
+data/*.json
+data/json-backup/
+
+# Sensitive/test files
+*-result.json
+group-members.txt

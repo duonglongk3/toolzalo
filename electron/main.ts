@@ -1,11 +1,20 @@
 import { app, BrowserWindow, Menu, ipcMain, dialog, shell, nativeImage } from 'electron'
 import { join, normalize } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, statSync, copyFileSync } from 'fs'
 import Store from 'electron-store'
+import { DatabaseService } from './database/database'
+import { MigrationService } from './database/migration'
+import { checkLicense, getStoredLicense, clearStoredLicense, generateHWID } from './license/license-service'
+import { initAutoUpdater, registerUpdaterIPC } from './updater/auto-updater'
 
 // Simple utility functions to replace @electron-toolkit/utils
 const is = {
-  dev: process.env.NODE_ENV === 'development'
+  dev: process.env.NODE_ENV === 'development' || process.argv.includes('--dev')
+}
+
+// Set renderer URL for development
+if (is.dev && !process.env['ELECTRON_RENDERER_URL']) {
+  process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:3000'
 }
 
 const electronApp = {
@@ -29,6 +38,92 @@ const optimizer = {
 
 // Initialize electron store for persistent data
 const store = new Store()
+
+// Initialize database
+let db: DatabaseService | null = null
+let migrationService: MigrationService | null = null
+
+const initializeDatabase = () => {
+  const dataDir = getDataDir()
+  const dbPath = join(dataDir, 'zalo-manager.db')
+
+  console.log('📦 Initializing database at:', dbPath)
+  db = new DatabaseService(dbPath)
+  migrationService = new MigrationService(db)
+
+  // Check if migration is needed
+  if (migrationService.needsMigration()) {
+    console.log('🔄 Database is empty, checking for JSON files to migrate...')
+    performMigration()
+  } else {
+    console.log('✅ Database already initialized')
+  }
+
+  return db
+}
+
+const performMigration = () => {
+  if (!db || !migrationService) return
+
+  const dataDir = getDataDir()
+
+  try {
+    // Read existing JSON files
+    const accountsFile = join(dataDir, 'zalo-accounts.json')
+    const friendsFile = join(dataDir, 'zalo-friends.json')
+    const groupsFile = join(dataDir, 'zalo-groups.json')
+    const templatesFile = join(dataDir, 'zalo-templates.json')
+
+    const jsonData: any = {}
+
+    if (existsSync(accountsFile)) {
+      const content = readFileSync(accountsFile, 'utf-8')
+      const parsed = JSON.parse(content)
+      jsonData.accounts = parsed.state?.accounts || []
+      console.log(`📄 Found ${jsonData.accounts.length} accounts in JSON`)
+    }
+
+    if (existsSync(friendsFile)) {
+      const content = readFileSync(friendsFile, 'utf-8')
+      const parsed = JSON.parse(content)
+      jsonData.friends = parsed.state?.friends || []
+      console.log(`📄 Found ${jsonData.friends.length} friends in JSON`)
+    }
+
+    if (existsSync(groupsFile)) {
+      const content = readFileSync(groupsFile, 'utf-8')
+      const parsed = JSON.parse(content)
+      jsonData.groups = parsed.state?.groups || []
+      console.log(`📄 Found ${jsonData.groups.length} groups in JSON`)
+    }
+
+    if (existsSync(templatesFile)) {
+      const content = readFileSync(templatesFile, 'utf-8')
+      const parsed = JSON.parse(content)
+      jsonData.templates = parsed.state?.templates || []
+      console.log(`📄 Found ${jsonData.templates.length} templates in JSON`)
+    }
+
+    // Perform migration
+    if (Object.keys(jsonData).length > 0) {
+      migrationService.migrateFromJSON(jsonData)
+
+      // Backup JSON files
+      const backupDir = join(dataDir, 'json-backup')
+      if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true })
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      if (existsSync(accountsFile)) copyFileSync(accountsFile, join(backupDir, `zalo-accounts-${timestamp}.json`))
+      if (existsSync(friendsFile)) copyFileSync(friendsFile, join(backupDir, `zalo-friends-${timestamp}.json`))
+      if (existsSync(groupsFile)) copyFileSync(groupsFile, join(backupDir, `zalo-groups-${timestamp}.json`))
+      if (existsSync(templatesFile)) copyFileSync(templatesFile, join(backupDir, `zalo-templates-${timestamp}.json`))
+
+      console.log('✅ Migration completed and JSON files backed up')
+    }
+  } catch (error) {
+    console.error('❌ Migration failed:', error)
+  }
+}
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -57,8 +152,8 @@ function createWindow(): void {
     if (mainWindow) {
       mainWindow.show()
 
-      // Always open DevTools for debugging
-      mainWindow.webContents.openDevTools()
+      // Open DevTools only in development mode
+      // mainWindow.webContents.openDevTools()
     }
   })
 
@@ -80,12 +175,23 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.zalomanager.app')
 
+  // Initialize database before creating window
+  initializeDatabase()
+
+  // Register updater IPC handlers
+  registerUpdaterIPC()
+
   // Default open or close DevTools by F12 in development
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
   createWindow()
+
+  // Initialize auto-updater after window is created (only in production)
+  if (!is.dev && mainWindow) {
+    initAutoUpdater(mainWindow)
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -164,6 +270,34 @@ ipcMain.handle('get-app-path', (_, name: string) => {
   return app.getPath(name as any)
 })
 
+// ==================== LICENSE IPC HANDLERS ====================
+
+ipcMain.handle('license-check', async (_event, key: string, forceCheck = false) => {
+  try {
+    const result = await checkLicense(key, forceCheck)
+    return result
+  } catch (error: any) {
+    return {
+      success: false,
+      valid: false,
+      code: 'ERROR',
+      error: error?.message || 'Unknown error'
+    }
+  }
+})
+
+ipcMain.handle('license-get-stored', () => {
+  return getStoredLicense()
+})
+
+ipcMain.handle('license-clear', () => {
+  clearStoredLicense()
+  return { success: true }
+})
+
+ipcMain.handle('license-get-hwid', () => {
+  return generateHWID()
+})
 
 // Data directory and JSON file IPC handlers
 const getDataDir = () => {
@@ -214,6 +348,142 @@ ipcMain.handle('data-remove', (_event, filename: string) => {
     return false
   }
 })
+
+// ==================== DATABASE IPC HANDLERS ====================
+
+// Accounts
+ipcMain.handle('db-get-accounts', () => {
+  return db?.getAllAccounts() || []
+})
+
+ipcMain.handle('db-get-account', (_event, id: string) => {
+  return db?.getAccount(id)
+})
+
+ipcMain.handle('db-create-account', (_event, account: any) => {
+  return db?.createAccount(account)
+})
+
+ipcMain.handle('db-update-account', (_event, id: string, updates: any) => {
+  return db?.updateAccount(id, updates)
+})
+
+ipcMain.handle('db-delete-account', (_event, id: string) => {
+  return db?.deleteAccount(id)
+})
+
+// Friends
+ipcMain.handle('db-get-friends', (_event, accountId: string) => {
+  return db?.getFriendsByAccount(accountId) || []
+})
+
+ipcMain.handle('db-get-friends-with-tags', (_event, accountId: string) => {
+  return db?.getFriendsWithTags(accountId) || []
+})
+
+ipcMain.handle('db-upsert-friend', (_event, friend: any) => {
+  return db?.upsertFriend(friend)
+})
+
+ipcMain.handle('db-update-friend', (_event, id: string, accountId: string, updates: any) => {
+  return db?.updateFriend(id, accountId, updates)
+})
+
+ipcMain.handle('db-delete-friend', (_event, id: string, accountId: string) => {
+  return db?.deleteFriend(id, accountId)
+})
+
+// Friend Tags
+ipcMain.handle('db-add-friend-tag', (_event, friendId: string, accountId: string, tag: string) => {
+  db?.addFriendTag(friendId, accountId, tag)
+  return true
+})
+
+ipcMain.handle('db-remove-friend-tag', (_event, friendId: string, accountId: string, tag: string) => {
+  db?.removeFriendTag(friendId, accountId, tag)
+  return true
+})
+
+ipcMain.handle('db-get-friend-tags', (_event, friendId: string, accountId: string) => {
+  return db?.getFriendTags(friendId, accountId) || []
+})
+
+ipcMain.handle('db-get-all-tags', (_event, accountId: string) => {
+  return db?.getAllTagsByAccount(accountId) || []
+})
+
+// Groups
+ipcMain.handle('db-get-groups', (_event, accountId: string) => {
+  return db?.getGroupsByAccount(accountId) || []
+})
+
+ipcMain.handle('db-upsert-group', (_event, group: any) => {
+  return db?.upsertGroup(group)
+})
+
+ipcMain.handle('db-update-group', (_event, id: string, accountId: string, updates: any) => {
+  return db?.updateGroup(id, accountId, updates)
+})
+
+ipcMain.handle('db-delete-group', (_event, id: string, accountId: string) => {
+  return db?.deleteGroup(id, accountId)
+})
+
+// Templates
+ipcMain.handle('db-get-templates', () => {
+  return db?.getAllTemplates() || []
+})
+
+ipcMain.handle('db-create-template', (_event, template: any) => {
+  return db?.createTemplate(template)
+})
+
+ipcMain.handle('db-update-template', (_event, id: string, updates: any) => {
+  return db?.updateTemplate(id, updates)
+})
+
+ipcMain.handle('db-delete-template', (_event, id: string) => {
+  return db?.deleteTemplate(id)
+})
+
+// Message Logs
+ipcMain.handle('db-create-message-log', (_event, log: any) => {
+  return db?.createMessageLog(log)
+})
+
+ipcMain.handle('db-get-message-logs', (_event, accountId: string, limit?: number) => {
+  return db?.getMessageLogsByAccount(accountId, limit) || []
+})
+
+// Share Content
+ipcMain.handle('db-get-share-content', () => {
+  return db?.getAllShareContent() || []
+})
+
+ipcMain.handle('db-create-share-content', (_event, content: any) => {
+  return db?.createShareContent(content)
+})
+
+ipcMain.handle('db-update-share-content', (_event, id: string, updates: any) => {
+  return db?.updateShareContent(id, updates)
+})
+
+ipcMain.handle('db-delete-share-content', (_event, id: string) => {
+  return db?.deleteShareContent(id)
+})
+
+// Share Categories
+ipcMain.handle('db-get-share-categories', () => {
+  return db?.getAllShareCategories() || []
+})
+
+ipcMain.handle('db-create-share-category', (_event, category: any) => {
+  return db?.createShareCategory(category)
+})
+
+ipcMain.handle('db-delete-share-category', (_event, id: string) => {
+  return db?.deleteShareCategory(id)
+})
 // Zalo API handlers using zca-js in main process
 let Zalo: any = null
 let zaloInstance: any = null
@@ -223,8 +493,40 @@ const initializeZalo = async () => {
   try {
     // Load CJS build of zca-js to be compatible with Electron main (CommonJS)
     const path = require('path')
-    const zcaPath = path.join(__dirname, '../../zca-js/dist/cjs/index.cjs')
-    console.log('🔎 Trying to load zca-js (CJS) from:', zcaPath)
+    const fs = require('fs')
+    
+    // Try multiple paths for different environments
+    const possiblePaths = [
+      // Development: relative to dist/main/main.js
+      path.join(__dirname, '../../zca-js/dist/cjs/index.cjs'),
+      // Production (asar): relative to app.asar/dist/main
+      path.join(__dirname, '../../zca-js/dist/cjs/index.cjs'),
+      // Production (unpacked): process.resourcesPath
+      path.join(process.resourcesPath || '', 'app.asar', 'zca-js', 'dist', 'cjs', 'index.cjs'),
+      // Alternative: app path
+      path.join(app.getAppPath(), 'zca-js', 'dist', 'cjs', 'index.cjs'),
+    ]
+    
+    let zcaPath = ''
+    for (const p of possiblePaths) {
+      console.log('🔎 Checking zca-js path:', p)
+      try {
+        // For asar, fs.existsSync works
+        if (fs.existsSync(p)) {
+          zcaPath = p
+          break
+        }
+      } catch {
+        // Continue to next path
+      }
+    }
+    
+    if (!zcaPath) {
+      // Fallback: use app path directly
+      zcaPath = path.join(app.getAppPath(), 'zca-js', 'dist', 'cjs', 'index.cjs')
+    }
+    
+    console.log('🔎 Loading zca-js from:', zcaPath)
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const zcaModule = require(zcaPath)
@@ -236,6 +538,161 @@ const initializeZalo = async () => {
     return false
   }
 }
+
+// Store for active QR login sessions
+let activeQRSession: { abort: () => void } | null = null
+
+// Login QR handler
+ipcMain.handle('zalo-login-qr-start', async (_event) => {
+  try {
+    console.log('🔥 Main process: zalo-login-qr-start called')
+
+    if (!await initializeZalo()) {
+      return { success: false, error: 'Failed to initialize Zalo library' }
+    }
+
+    // Abort any existing QR session
+    if (activeQRSession) {
+      try { activeQRSession.abort() } catch {}
+      activeQRSession = null
+    }
+
+    zaloInstance = new Zalo({
+      selfListen: true,
+      imageMetadataGetter: async (filePath: string) => {
+        try {
+          const img = nativeImage.createFromPath(filePath)
+          const size = img.getSize()
+          if (!size || !size.width || !size.height) return null
+          const stat = statSync(filePath)
+          return { width: size.width, height: size.height, size: stat.size }
+        } catch (e) {
+          console.warn('imageMetadataGetter failed:', e)
+          return null
+        }
+      }
+    })
+
+    return new Promise((resolve) => {
+      let resolved = false
+
+      zaloInstance.loginQR(
+        { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0' },
+        async (event: any) => {
+          console.log('🔥 QR Login event:', event.type)
+
+          // Send event to renderer
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('zalo-qr-event', {
+              type: event.type,
+              data: event.data
+            })
+          }
+
+          // Handle different event types (from zca-js LoginQRCallbackEventType)
+          switch (event.type) {
+            case 0: // QRCodeGenerated
+              console.log('📱 QR Code generated')
+              // Store abort function for cancellation
+              activeQRSession = { abort: event.actions.abort }
+              break
+
+            case 1: // QRCodeExpired
+              console.log('⏰ QR Code expired')
+              // Auto retry
+              if (event.actions?.retry) {
+                event.actions.retry()
+              }
+              break
+
+            case 2: // QRCodeScanned
+              console.log('✅ QR Code scanned by:', event.data?.display_name)
+              break
+
+            case 3: // QRCodeDeclined
+              console.log('❌ QR Code declined')
+              activeQRSession = null
+              if (!resolved) {
+                resolved = true
+                resolve({ success: false, error: 'Login declined by user' })
+              }
+              break
+
+            case 4: // GotLoginInfo
+              console.log('🎉 Got login info!')
+              activeQRSession = null
+
+              // Now login with the obtained credentials
+              try {
+                zaloAPI = await zaloInstance.login({
+                  cookie: event.data.cookie,
+                  imei: event.data.imei,
+                  userAgent: event.data.userAgent
+                })
+
+                if (zaloAPI?.listener?.ctx) {
+                  console.log('✅ Main process: Zalo QR login successful')
+
+                  // Get account info
+                  const accountInfo = await zaloAPI.fetchAccountInfo()
+
+                  if (!resolved) {
+                    resolved = true
+                    resolve({
+                      success: true,
+                      uid: zaloAPI.listener.ctx.uid,
+                      credentials: {
+                        cookie: JSON.stringify(event.data.cookie),
+                        imei: event.data.imei,
+                        userAgent: event.data.userAgent
+                      },
+                      accountInfo
+                    })
+                  }
+                } else {
+                  if (!resolved) {
+                    resolved = true
+                    resolve({ success: false, error: 'Login failed - no valid API context' })
+                  }
+                }
+              } catch (loginError: any) {
+                console.error('QR login cookie error:', loginError)
+                if (!resolved) {
+                  resolved = true
+                  resolve({ success: false, error: loginError?.message || 'Login failed' })
+                }
+              }
+              break
+          }
+        }
+      ).catch((error: any) => {
+        console.error('🔥 QR Login error:', error)
+        activeQRSession = null
+        if (!resolved) {
+          resolved = true
+          resolve({ success: false, error: error?.message || 'QR login failed' })
+        }
+      })
+    })
+  } catch (error: any) {
+    console.error('🔥 Main process: Zalo QR login error:', error)
+    return { success: false, error: error?.message || String(error) }
+  }
+})
+
+// Cancel QR login
+ipcMain.handle('zalo-login-qr-cancel', async () => {
+  try {
+    if (activeQRSession) {
+      activeQRSession.abort()
+      activeQRSession = null
+      console.log('🔥 QR login cancelled')
+    }
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || String(error) }
+  }
+})
 
 ipcMain.handle('zalo-login', async (_event, credentials) => {
   try {

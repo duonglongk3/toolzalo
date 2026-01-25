@@ -32,9 +32,66 @@ const electronAPI = {
     write: (filename: string, content: string) => ipcRenderer.invoke('data-write', filename, content),
     remove: (filename: string) => ipcRenderer.invoke('data-remove', filename),
   },
+
+  // Database operations
+  db: {
+    // Accounts
+    getAccounts: () => ipcRenderer.invoke('db-get-accounts'),
+    getAccount: (id: string) => ipcRenderer.invoke('db-get-account', id),
+    createAccount: (account: any) => ipcRenderer.invoke('db-create-account', account),
+    updateAccount: (id: string, updates: any) => ipcRenderer.invoke('db-update-account', id, updates),
+    deleteAccount: (id: string) => ipcRenderer.invoke('db-delete-account', id),
+
+    // Friends
+    getFriends: (accountId: string) => ipcRenderer.invoke('db-get-friends', accountId),
+    getFriendsWithTags: (accountId: string) => ipcRenderer.invoke('db-get-friends-with-tags', accountId),
+    upsertFriend: (friend: any) => ipcRenderer.invoke('db-upsert-friend', friend),
+    updateFriend: (id: string, accountId: string, updates: any) => ipcRenderer.invoke('db-update-friend', id, accountId, updates),
+    deleteFriend: (id: string, accountId: string) => ipcRenderer.invoke('db-delete-friend', id, accountId),
+
+    // Friend Tags
+    addFriendTag: (friendId: string, accountId: string, tag: string) => ipcRenderer.invoke('db-add-friend-tag', friendId, accountId, tag),
+    removeFriendTag: (friendId: string, accountId: string, tag: string) => ipcRenderer.invoke('db-remove-friend-tag', friendId, accountId, tag),
+    getFriendTags: (friendId: string, accountId: string) => ipcRenderer.invoke('db-get-friend-tags', friendId, accountId),
+    getAllTags: (accountId: string) => ipcRenderer.invoke('db-get-all-tags', accountId),
+
+    // Groups
+    getGroups: (accountId: string) => ipcRenderer.invoke('db-get-groups', accountId),
+    upsertGroup: (group: any) => ipcRenderer.invoke('db-upsert-group', group),
+    updateGroup: (id: string, accountId: string, updates: any) => ipcRenderer.invoke('db-update-group', id, accountId, updates),
+    deleteGroup: (id: string, accountId: string) => ipcRenderer.invoke('db-delete-group', id, accountId),
+
+    // Templates
+    getTemplates: () => ipcRenderer.invoke('db-get-templates'),
+    createTemplate: (template: any) => ipcRenderer.invoke('db-create-template', template),
+    updateTemplate: (id: string, updates: any) => ipcRenderer.invoke('db-update-template', id, updates),
+    deleteTemplate: (id: string) => ipcRenderer.invoke('db-delete-template', id),
+
+    // Message Logs
+    createMessageLog: (log: any) => ipcRenderer.invoke('db-create-message-log', log),
+    getMessageLogs: (accountId: string, limit?: number) => ipcRenderer.invoke('db-get-message-logs', accountId, limit),
+
+    // Share Content
+    getShareContent: () => ipcRenderer.invoke('db-get-share-content'),
+    createShareContent: (content: any) => ipcRenderer.invoke('db-create-share-content', content),
+    updateShareContent: (id: string, updates: any) => ipcRenderer.invoke('db-update-share-content', id, updates),
+    deleteShareContent: (id: string) => ipcRenderer.invoke('db-delete-share-content', id),
+
+    // Share Categories
+    getShareCategories: () => ipcRenderer.invoke('db-get-share-categories'),
+    createShareCategory: (category: any) => ipcRenderer.invoke('db-create-share-category', category),
+    deleteShareCategory: (id: string) => ipcRenderer.invoke('db-delete-share-category', id),
+  },
   // Zalo API operations
   zalo: {
     login: (credentials: any) => ipcRenderer.invoke('zalo-login', credentials),
+    loginQRStart: () => ipcRenderer.invoke('zalo-login-qr-start'),
+    loginQRCancel: () => ipcRenderer.invoke('zalo-login-qr-cancel'),
+    onQREvent: (callback: (event: { type: number; data: any }) => void) => {
+      const handler = (_: any, event: { type: number; data: any }) => callback(event)
+      ipcRenderer.on('zalo-qr-event', handler)
+      return () => ipcRenderer.removeListener('zalo-qr-event', handler)
+    },
     logout: () => ipcRenderer.invoke('zalo-logout'),
     isLoggedIn: () => ipcRenderer.invoke('zalo-is-logged-in'),
     getFriends: () => ipcRenderer.invoke('zalo-get-friends'),
@@ -87,6 +144,27 @@ const electronAPI = {
     onAbout: (callback: () => void) => {
       ipcRenderer.on('menu-about', callback)
       return () => ipcRenderer.removeListener('menu-about', callback)
+    },
+  },
+
+  // License operations
+  license: {
+    check: (key: string, forceCheck?: boolean) => ipcRenderer.invoke('license-check', key, forceCheck),
+    getStored: () => ipcRenderer.invoke('license-get-stored'),
+    clear: () => ipcRenderer.invoke('license-clear'),
+    getHWID: () => ipcRenderer.invoke('license-get-hwid'),
+  },
+
+  // Auto-updater operations
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('updater-check'),
+    downloadUpdate: () => ipcRenderer.invoke('updater-download'),
+    installUpdate: () => ipcRenderer.invoke('updater-install'),
+    getVersion: () => ipcRenderer.invoke('updater-get-version'),
+    onStatus: (callback: (data: { status: string; data?: any }) => void) => {
+      const handler = (_: any, data: { status: string; data?: any }) => callback(data)
+      ipcRenderer.on('updater-status', handler)
+      return () => ipcRenderer.removeListener('updater-status', handler)
     },
   },
 

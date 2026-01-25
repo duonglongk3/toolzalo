@@ -1,11 +1,13 @@
 import React from 'react'
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Globe, Bell, Shield, Database, Download, Upload, RotateCcw } from 'lucide-react'
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Globe, Bell, Shield, Database, Download, Upload, RotateCcw, Key, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Modal, Input } from '@/components/ui'
 import { useAppStore } from '@/store'
+import { useLicense } from '@/contexts/LicenseContext'
 import toast from 'react-hot-toast'
 
 const Settings: React.FC = () => {
   const { config, updateConfig } = useAppStore()
+  const { isLicenseValid, licenseInfo, clearLicense, hwid } = useLicense()
   const [showBackupModal, setShowBackupModal] = React.useState(false)
   const [showRestoreModal, setShowRestoreModal] = React.useState(false)
   const [backupData, setBackupData] = React.useState('')
@@ -121,6 +123,79 @@ const Settings: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* License Info */}
+      <Card className={isLicenseValid ? 'border-green-200' : 'border-yellow-200'}>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Key className="w-5 h-5" />
+            <span>Thông tin License</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLicenseValid && licenseInfo ? (
+            <>
+              <div className="flex items-center space-x-2 text-green-600">
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-medium">License đã kích hoạt</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-secondary-500">Sản phẩm:</span>
+                  <p className="font-medium">{licenseInfo.product}</p>
+                </div>
+                <div>
+                  <span className="text-secondary-500">Loại:</span>
+                  <p className="font-medium capitalize">{licenseInfo.type}</p>
+                </div>
+                <div>
+                  <span className="text-secondary-500">Hết hạn:</span>
+                  <p className="font-medium">
+                    {licenseInfo.isLifetime ? 'Vĩnh viễn' : new Date(licenseInfo.expiryDate).toLocaleDateString('vi-VN')}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-secondary-500">Thiết bị:</span>
+                  <p className="font-medium">{licenseInfo.activeDevices}/{licenseInfo.maxDevices}</p>
+                </div>
+              </div>
+
+              {!licenseInfo.isLifetime && licenseInfo.daysRemaining <= 7 && (
+                <div className="flex items-center p-3 bg-yellow-50 rounded-lg text-yellow-700">
+                  <AlertTriangle className="w-5 h-5 mr-2" />
+                  <span className="text-sm">License sẽ hết hạn trong {licenseInfo.daysRemaining} ngày</span>
+                </div>
+              )}
+
+              <div className="pt-3 border-t">
+                <div className="text-xs text-secondary-500 mb-2">
+                  HWID: <span className="font-mono">{hwid}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm('Bạn có chắc muốn hủy kích hoạt license này?')) {
+                      clearLicense()
+                      toast.success('Đã hủy kích hoạt license')
+                      window.location.reload()
+                    }
+                  }}
+                  className="text-red-600"
+                >
+                  Hủy kích hoạt
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-2" />
+              <p className="text-secondary-600">Chưa kích hoạt license</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Appearance Settings */}
       <Card>
@@ -363,27 +438,56 @@ const Settings: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* App Info */}
+      {/* App Info & Update */}
       <Card>
         <CardHeader>
           <CardTitle>Thông tin ứng dụng</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-secondary-600">Phiên bản:</span>
-            <Badge variant="outline">v{appVersion}</Badge>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-secondary-600">Phiên bản:</span>
+              <Badge variant="outline">v{appVersion}</Badge>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary-600">Electron:</span>
+              <Badge variant="outline">{versions?.electron || 'N/A'}</Badge>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary-600">Node.js:</span>
+              <Badge variant="outline">{versions?.node || 'N/A'}</Badge>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary-600">Chrome:</span>
+              <Badge variant="outline">{versions?.chrome || 'N/A'}</Badge>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-secondary-600">Electron:</span>
-            <Badge variant="outline">{versions?.electron || 'N/A'}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-secondary-600">Node.js:</span>
-            <Badge variant="outline">{versions?.node || 'N/A'}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-secondary-600">Chrome:</span>
-            <Badge variant="outline">{versions?.chrome || 'N/A'}</Badge>
+          
+          <div className="pt-4 border-t border-secondary-200">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const api = (window as any).electronAPI
+                if (!api?.updater) {
+                  toast.error('Tính năng cập nhật không khả dụng')
+                  return
+                }
+                toast.loading('Đang kiểm tra cập nhật...', { id: 'check-update' })
+                const result = await api.updater.checkForUpdates()
+                toast.dismiss('check-update')
+                if (!result.success) {
+                  toast.error(`Lỗi: ${result.error}`)
+                } else if (!result.updateInfo?.version || result.updateInfo.version === appVersion) {
+                  toast.success('Bạn đang sử dụng phiên bản mới nhất!')
+                }
+              }}
+              icon={<RefreshCw className="w-4 h-4" />}
+            >
+              Kiểm tra cập nhật
+            </Button>
+            <p className="text-xs text-secondary-500 mt-2">
+              Kiểm tra và tải về phiên bản mới nhất từ GitHub
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -9,7 +9,8 @@ import {
   Clock
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
-import { useAccountStore, useFriendsStore, useGroupsStore, useAppStore } from '@/store'
+import { useFriendsStore, useGroupsStore, useAppStore } from '@/store'
+import { useAccountStore } from '@/store/database-store'
 import { formatNumber, formatRelativeTime } from '@/utils'
 
 const Dashboard: React.FC = () => {

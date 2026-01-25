@@ -6,12 +6,16 @@ import {
   Plus,
   Download,
   Upload,
-  Settings
+  Settings,
+  RefreshCw,
+  ArrowDownCircle,
+  CheckCircle
 } from 'lucide-react'
 import { Button, Input, Badge } from '@/components/ui'
 import { useAppStore } from '@/store'
 import { cn } from '@/utils'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
@@ -28,8 +32,46 @@ const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = React.useState('')
   const [showNotifications, setShowNotifications] = React.useState(false)
+  
+  // Update states
+  const [updateStatus, setUpdateStatus] = React.useState<'idle' | 'checking' | 'available' | 'downloading' | 'ready'>('idle')
+  const [updateVersion, setUpdateVersion] = React.useState<string>('')
+  const [downloadProgress, setDownloadProgress] = React.useState(0)
 
   const unreadNotifications = notifications.filter(n => !n.id.includes('read')).length
+
+  // Listen for update events
+  React.useEffect(() => {
+    const api = (window as any).electronAPI
+    if (!api?.updater) return
+
+    const unsubscribe = api.updater.onStatus((data: { status: string; data?: any }) => {
+      switch (data.status) {
+        case 'checking-for-update':
+          setUpdateStatus('checking')
+          break
+        case 'update-available':
+          setUpdateStatus('available')
+          setUpdateVersion(data.data?.version || '')
+          break
+        case 'update-not-available':
+          setUpdateStatus('idle')
+          break
+        case 'download-progress':
+          setUpdateStatus('downloading')
+          setDownloadProgress(data.data?.percent || 0)
+          break
+        case 'update-downloaded':
+          setUpdateStatus('ready')
+          break
+        case 'update-error':
+          setUpdateStatus('idle')
+          break
+      }
+    })
+
+    return () => unsubscribe?.()
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,6 +147,141 @@ const Header: React.FC<HeaderProps> = ({
     navigate('/settings')
   }
 
+  const handleCheckUpdate = async () => {
+    const api = (window as any).electronAPI
+    if (!api?.updater) {
+      toast.error('Tính năng cập nhật không khả dụng')
+      return
+    }
+    
+    setUpdateStatus('checking')
+    toast.loading('Đang kiểm tra cập nhật...', { id: 'check-update' })
+    
+    try {
+      const result = await api.updater.checkForUpdates()
+      toast.dismiss('check-update')
+      
+      if (!result.success) {
+        toast.error(`Lỗi: ${result.error}`)
+        setUpdateStatus('idle')
+      } else if (result.updateInfo?.version) {
+        // Update available - status will be set by event listener
+      } else {
+        toast.success('Bạn đang sử dụng phiên bản mới nhất!')
+        setUpdateStatus('idle')
+      }
+    } catch (error) {
+      toast.dismiss('check-update')
+      toast.error('Không thể kiểm tra cập nhật')
+      setUpdateStatus('idle')
+    }
+  }
+
+  const handleDownloadUpdate = async () => {
+    const api = (window as any).electronAPI
+    if (!api?.updater) return
+    
+    toast.loading('Đang tải bản cập nhật...', { id: 'download-update' })
+    
+    try {
+      const result = await api.updater.downloadUpdate()
+      toast.dismiss('download-update')
+      
+      if (!result.success) {
+        toast.error(`Lỗi tải: ${result.error}`)
+        setUpdateStatus('available')
+      }
+    } catch (error) {
+      toast.dismiss('download-update')
+      toast.error('Không thể tải bản cập nhật')
+      setUpdateStatus('available')
+    }
+  }
+
+  const handleInstallUpdate = () => {
+    const api = (window as any).electronAPI
+    if (!api?.updater) return
+    
+    if (window.confirm('Ứng dụng sẽ khởi động lại để cài đặt bản cập nhật. Bạn có muốn tiếp tục?')) {
+      api.updater.installUpdate()
+    }
+  }
+
+  // Render update button based on status
+  const renderUpdateButton = () => {
+    switch (updateStatus) {
+      case 'checking':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="p-2"
+            title="Đang kiểm tra..."
+          >
+            <RefreshCw className="w-5 h-5 animate-spin text-primary-500" />
+          </Button>
+        )
+      
+      case 'available':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDownloadUpdate}
+            className="p-2 relative"
+            title={`Tải bản cập nhật v${updateVersion}`}
+          >
+            <ArrowDownCircle className="w-5 h-5 text-primary-500" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
+          </Button>
+        )
+      
+      case 'downloading':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="p-2 relative"
+            title={`Đang tải ${downloadProgress.toFixed(0)}%`}
+          >
+            <RefreshCw className="w-5 h-5 animate-spin text-primary-500" />
+            <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 text-[10px] text-primary-600 font-medium">
+              {downloadProgress.toFixed(0)}%
+            </span>
+          </Button>
+        )
+      
+      case 'ready':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleInstallUpdate}
+            className="p-2 relative"
+            title="Cài đặt và khởi động lại"
+          >
+            <CheckCircle className="w-5 h-5 text-success-500" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-success-500 rounded-full animate-pulse" />
+          </Button>
+        )
+      
+      default:
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCheckUpdate}
+            className="p-2"
+            title="Kiểm tra cập nhật"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </Button>
+        )
+    }
+  }
+
   return (
     <header className="h-16 bg-white dark:bg-secondary-800 border-b border-secondary-200 dark:border-secondary-700 flex items-center justify-between px-4">
       {/* Left section */}
@@ -163,6 +340,9 @@ const Header: React.FC<HeaderProps> = ({
             title="Export dữ liệu"
           />
         </div>
+
+        {/* Update button */}
+        {renderUpdateButton()}
 
         {/* Notifications */}
         <div className="relative">

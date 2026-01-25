@@ -10,7 +10,7 @@ import {
   Zap
 } from 'lucide-react'
 import { cn } from '@/utils'
-import { useAccountStore } from '@/store'
+import { useAccountStore } from '@/store/database-store'
 import { Badge } from '@/components/ui'
 
 interface SidebarProps {
@@ -74,8 +74,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
           </div>
           {!collapsed && (
             <div>
-              <h1 className="text-lg font-bold text-secondary-900 dark:text-secondary-100">Zalo Manager</h1>
-              <p className="text-xs text-secondary-500 dark:text-secondary-400">Professional Tool</p>
+              <h1 className="text-lg font-bold text-secondary-900 dark:text-secondary-100">ZALO TOOL</h1>
+              <p className="text-xs text-secondary-500 dark:text-secondary-400">SOCIALAUTOPRO</p>
             </div>
           )}
         </div>
@@ -148,8 +148,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
       {!collapsed && (
         <div className="p-4 border-t border-secondary-200">
           <div className="text-xs text-secondary-500 dark:text-secondary-400 text-center">
-            <p>Zalo Manager v1.0.0</p>
-            <p className="mt-1">Professional Desktop Tool</p>
+            <p>SOCIALAUTOPRO v1.0.0</p>
+            <p className="mt-1">by SocialAutoPro</p>
           </div>
         </div>
       )}

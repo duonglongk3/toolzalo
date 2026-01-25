@@ -1,0 +1,19 @@
+{
+  "name": "zalo-tool-updater",
+  "version": "1.0.0",
+  "description": "Updater for ZALO TOOL - SOCIALAUTOPRO",
+  "main": "updater.js",
+  "bin": "updater.js",
+  "pkg": {
+    "assets": [],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "../release"
+  },
+  "scripts": {
+    "build": "pkg . --output ../release/update.exe"
+  },
+  "author": "SocialAutoPro",
+  "license": "MIT"
+}

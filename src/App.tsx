@@ -1,6 +1,9 @@
 import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout'
+import { LicenseProvider } from '@/contexts/LicenseContext'
+import LicenseGuard from '@/components/LicenseGuard'
+import UpdateNotification from '@/components/UpdateNotification'
 
 // Direct imports for debugging (temporary)
 import Dashboard from '@/pages/Dashboard'
@@ -12,6 +15,7 @@ import GroupMessages from '@/pages/GroupMessages'
 import Settings from '@/pages/Settings'
 import TestAddUser from '@/pages/TestAddUser'
 import TestAdminGroups from '@/pages/TestAdminGroups'
+import ActiveKey from '@/pages/ActiveKey'
 
 // Loading component
 const PageLoader: React.FC = () => {
@@ -49,52 +53,38 @@ const PlaceholderPage: React.FC<{ title: string; description: string }> = ({ tit
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <div className="App">
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route
-              index
-              element={<Dashboard />}
-            />
-            <Route
-              path="accounts"
-              element={<Accounts />}
-            />
-            <Route
-              path="friends"
-              element={<Friends />}
-            />
-            <Route
-              path="personal-messages"
-              element={<PersonalMessages />}
-            />
-            <Route
-              path="groups"
-              element={<Groups />}
-            />
-            <Route
-              path="group-messages"
-              element={<GroupMessages />}
-            />
-            <Route
-              path="settings"
-              element={<Settings />}
-            />
-            <Route
-              path="test-add-user"
-              element={<TestAddUser />}
-            />
-            <Route
-              path="test-admin"
-              element={<TestAdminGroups />}
-            />
-            {/* Redirect unknown routes to dashboard */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </div>
-    </Router>
+    <LicenseProvider>
+      <Router>
+        <div className="App">
+          <Routes>
+            {/* License activation page - accessible without license */}
+            <Route path="/activate" element={<ActiveKey />} />
+            
+            {/* Protected routes - require valid license */}
+            <Route path="/" element={
+              <LicenseGuard>
+                <Layout />
+              </LicenseGuard>
+            }>
+              <Route index element={<Dashboard />} />
+              <Route path="accounts" element={<Accounts />} />
+              <Route path="friends" element={<Friends />} />
+              <Route path="personal-messages" element={<PersonalMessages />} />
+              <Route path="groups" element={<Groups />} />
+              <Route path="group-messages" element={<GroupMessages />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="test-add-user" element={<TestAddUser />} />
+              <Route path="test-admin" element={<TestAdminGroups />} />
+              {/* Redirect unknown routes to dashboard */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+          
+          {/* Update notification popup */}
+          <UpdateNotification />
+        </div>
+      </Router>
+    </LicenseProvider>
   )
 }
 

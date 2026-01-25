@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin Groups</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .result { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+        .group { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 3px; }
+        .admin { background-color: #e8f5e8; }
+        .not-admin { background-color: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>Test Admin Groups</h1>
+    
+    <button onclick="testGroupsAdmin()">Test Groups Admin Status</button>
+    
+    <div id="result" class="result" style="display: none;"></div>
+
+    <script>
+        async function testGroupsAdmin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>🔄 Testing groups admin status...</p>';
+            
+            try {
+                if (!window.electronAPI || !window.electronAPI.zalo) {
+                    resultDiv.innerHTML = '<p>❌ Electron API not available</p>';
+                    return;
+                }
+                
+                const result = await window.electronAPI.zalo.testGroupsAdmin();
+                
+                if (!result.success) {
+                    resultDiv.innerHTML = `<p>❌ Error: ${result.error}</p>`;
+                    return;
+                }
+                
+                let html = `
+                    <h3>🎯 Test Results</h3>
+                    <p><strong>Current User ID:</strong> ${result.currentUserId}</p>
+                    <p><strong>Admin Groups:</strong> ${result.adminCount} out of ${result.testedGroups} tested</p>
+                    <p><strong>Total Groups in Account:</strong> ${result.totalGroups}</p>
+                `;
+                
+                if (result.results && result.results.length > 0) {
+                    html += '<h4>📋 Group Details:</h4>';
+                    
+                    result.results.forEach(group => {
+                        const className = group.isAdmin ? 'admin' : 'not-admin';
+                        const adminStatus = group.isAdmin ? '✅ ADMIN' : '❌ Not Admin';
+                        
+                        html += `
+                            <div class="group ${className}">
+                                <strong>${group.name}</strong> ${adminStatus}<br>
+                                <small>ID: ${group.id}</small><br>
+                                <small>Members: ${group.memberCount}</small><br>
+                                <small>Admin IDs: [${group.adminIds.join(', ')}]</small>
+                            </div>
+                        `;
+                    });
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Test error:', error);
+                resultDiv.innerHTML = `<p>❌ Exception: ${error.message}</p>`;
+            }
+        }
+        
+        // Auto test when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(testGroupsAdmin, 1000);
+        });
+    </script>
+</body>
+</html>

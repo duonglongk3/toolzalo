@@ -1,22 +1,30 @@
 import React from 'react'
-import { Plus, Edit, Trash2, Power, PowerOff, Eye, EyeOff, Wifi, WifiOff, AlertCircle } from 'lucide-react'
+import { Plus, Edit, Trash2, Power, PowerOff, Eye, EyeOff, Wifi, WifiOff, AlertCircle, QrCode } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Modal, Input } from '@/components/ui'
-import { useAccountStore } from '@/store'
+import { useAccountStore } from '@/store/database-store'
 import { formatRelativeTime, cn } from '@/utils'
 import { zaloService } from '@/services'
 import type { ZaloAccount } from '@/types'
 import toast from 'react-hot-toast'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import LoginQRModal from '@/components/LoginQRModal'
 
 const Accounts: React.FC = () => {
   console.log('🔥 Accounts component rendered')
-  const { accounts, activeAccount, addAccount, updateAccount, deleteAccount, setActiveAccount } = useAccountStore()
+  const { accounts, activeAccount, loading, loadAccounts, addAccount, updateAccount, deleteAccount, setActiveAccount } = useAccountStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [showAddModal, setShowAddModal] = React.useState(false)
+  const [showQRModal, setShowQRModal] = React.useState(false)
   const [editingAccount, setEditingAccount] = React.useState<ZaloAccount | null>(null)
   const [showPassword, setShowPassword] = React.useState<Record<string, boolean>>({})
   const [testingConnection, setTestingConnection] = React.useState<Record<string, boolean>>({})
+
+  // Load accounts from database on mount
+  React.useEffect(() => {
+    console.log('🔥 Loading accounts from database...')
+    loadAccounts()
+  }, [loadAccounts])
 
   // Check URL params to auto-open modal
   React.useEffect(() => {
@@ -51,7 +59,7 @@ const Accounts: React.FC = () => {
     })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log('🔥 handleSubmit called with:', formData)
 
@@ -63,20 +71,20 @@ const Accounts: React.FC = () => {
 
     try {
       if (editingAccount) {
-        updateAccount(editingAccount.id, {
+        await updateAccount(editingAccount.id, {
           ...formData,
           status: 'offline' // Reset status when updating credentials
         })
         toast.success('Cập nhật tài khoản thành công')
         setEditingAccount(null)
       } else {
-        addAccount({
+        await addAccount({
           ...formData,
           status: 'offline'
         })
         toast.success('Thêm tài khoản thành công')
       }
-      
+
       setShowAddModal(false)
       resetForm()
     } catch (error) {
@@ -97,21 +105,30 @@ const Accounts: React.FC = () => {
     setShowAddModal(true)
   }
 
-  const handleDelete = (account: ZaloAccount) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${account.name}"?`)) {
-      deleteAccount(account.id)
-      toast.success('Xóa tài khoản thành công')
+  const handleDelete = async (account: ZaloAccount) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${account.name}"?\n\nLưu ý: Tất cả bạn bè và nhóm liên quan sẽ bị xóa.`)) {
+      try {
+        await deleteAccount(account.id)
+        toast.success('Xóa tài khoản thành công')
+      } catch (error) {
+        console.error('Delete account error:', error)
+        toast.error('Không thể xóa tài khoản')
+      }
     }
   }
 
-  const handleSetActive = (account: ZaloAccount) => {
+  const handleSetActive = async (account: ZaloAccount) => {
     setActiveAccount(account)
     // Simulate login process
-    updateAccount(account.id, { 
-      status: 'online',
-      lastLogin: new Date()
-    })
-    toast.success(`Đã chuyển sang tài khoản "${account.name}"`)
+    try {
+      await updateAccount(account.id, {
+        status: 'online',
+        lastLogin: new Date()
+      })
+      toast.success(`Đã chuyển sang tài khoản "${account.name}"`)
+    } catch (error) {
+      console.error('Set active account error:', error)
+    }
   }
 
   const handleToggleStatus = (account: ZaloAccount) => {
@@ -171,6 +188,41 @@ const Accounts: React.FC = () => {
     resetForm()
   }
 
+  const handleQRLoginSuccess = async (result: {
+    credentials: { cookie: string; imei: string; userAgent: string }
+    accountInfo: any
+  }) => {
+    try {
+      const { credentials, accountInfo } = result
+
+      // Create new account with QR login data
+      const accountName = accountInfo?.profile?.displayName ||
+                          accountInfo?.profile?.zaloName ||
+                          accountInfo?.displayName ||
+                          'Tài khoản Zalo'
+
+      const phone = accountInfo?.profile?.phoneNumber ||
+                    accountInfo?.phoneNumber ||
+                    ''
+
+      await addAccount({
+        name: accountName,
+        phone: phone,
+        imei: credentials.imei,
+        cookie: credentials.cookie,
+        userAgent: credentials.userAgent,
+        status: 'online',
+        lastLogin: new Date()
+      })
+
+      setShowQRModal(false)
+      toast.success(`Đã thêm tài khoản "${accountName}" thành công!`)
+    } catch (error) {
+      console.error('QR login save error:', error)
+      toast.error('Không thể lưu tài khoản. Vui lòng thử lại.')
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Page Header */}
@@ -181,12 +233,21 @@ const Accounts: React.FC = () => {
             Thêm và quản lý các tài khoản Zalo của bạn
           </p>
         </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          icon={<Plus className="w-4 h-4" />}
-        >
-          Thêm tài khoản
-        </Button>
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowQRModal(true)}
+            icon={<QrCode className="w-4 h-4" />}
+          >
+            Đăng nhập QR
+          </Button>
+          <Button
+            onClick={() => setShowAddModal(true)}
+            icon={<Plus className="w-4 h-4" />}
+          >
+            Thêm thủ công
+          </Button>
+        </div>
       </div>
 
       {/* Accounts Grid */}
@@ -411,6 +472,13 @@ const Accounts: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* QR Login Modal */}
+      <LoginQRModal
+        open={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        onSuccess={handleQRLoginSuccess}
+      />
     </div>
   )
 }

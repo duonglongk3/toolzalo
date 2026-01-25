@@ -65,7 +65,7 @@ const Modal: React.FC<ModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
@@ -76,7 +76,7 @@ const Modal: React.FC<ModalProps> = ({
       <div
         ref={modalRef}
         className={cn(
-          'relative w-full bg-white dark:bg-secondary-800 rounded-xl shadow-large animate-scale-in',
+          'relative w-full bg-white dark:bg-secondary-800 rounded-xl shadow-large animate-scale-in flex flex-col max-h-[90vh]',
           sizeClasses[size],
           className
         )}
@@ -85,14 +85,14 @@ const Modal: React.FC<ModalProps> = ({
         aria-labelledby={title ? 'modal-title' : undefined}
         aria-describedby={description ? 'modal-description' : undefined}
       >
-        {/* Header */}
+        {/* Header - Fixed */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-6 pb-4 border-b border-secondary-200 dark:border-secondary-700">
-            <div className="flex-1">
+          <div className="flex items-center justify-between p-4 sm:p-6 pb-3 sm:pb-4 border-b border-secondary-200 dark:border-secondary-700 flex-shrink-0">
+            <div className="flex-1 min-w-0">
               {title && (
                 <h2 
                   id="modal-title"
-                  className="text-lg font-semibold text-secondary-900 dark:text-secondary-100"
+                  className="text-base sm:text-lg font-semibold text-secondary-900 dark:text-secondary-100 truncate"
                 >
                   {title}
                 </h2>
@@ -100,7 +100,7 @@ const Modal: React.FC<ModalProps> = ({
               {description && (
                 <p 
                   id="modal-description"
-                  className="mt-1 text-sm text-secondary-600 dark:text-secondary-400"
+                  className="mt-1 text-xs sm:text-sm text-secondary-600 dark:text-secondary-400 line-clamp-2"
                 >
                   {description}
                 </p>
@@ -112,7 +112,7 @@ const Modal: React.FC<ModalProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="ml-4 p-2"
+                className="ml-2 sm:ml-4 p-1.5 sm:p-2 flex-shrink-0"
                 aria-label="Đóng"
               >
                 <X className="h-4 w-4" />
@@ -121,8 +121,8 @@ const Modal: React.FC<ModalProps> = ({
           </div>
         )}
         
-        {/* Content */}
-        <div className="p-6">
+        {/* Content - Scrollable */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {children}
         </div>
       </div>
