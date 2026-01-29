@@ -87,6 +87,18 @@ export interface DbShareCategory {
   created_at: string
 }
 
+export interface DbSyncState {
+  id: string
+  account_id: string | null
+  friends_syncing: number // SQLite boolean (0 or 1)
+  friends_progress: number
+  friends_message: string | null
+  groups_syncing: number // SQLite boolean (0 or 1)
+  groups_progress: number
+  groups_message: string | null
+  updated_at: string
+}
+
 // Helper types for inserts (without auto-generated fields)
 export type DbAccountInsert = Omit<DbAccount, 'created_at' | 'updated_at'>
 export type DbFriendInsert = Omit<DbFriend, 'added_at'>
@@ -102,6 +114,7 @@ export type DbFriendUpdate = Partial<Omit<DbFriend, 'id' | 'account_id' | 'added
 export type DbGroupUpdate = Partial<Omit<DbGroup, 'id' | 'account_id' | 'joined_at'>>
 export type DbMessageTemplateUpdate = Partial<Omit<DbMessageTemplate, 'id' | 'created_at' | 'updated_at'>>
 export type DbShareContentUpdate = Partial<Omit<DbShareContent, 'id' | 'created_at' | 'updated_at'>>
+export type DbSyncStateUpdate = Partial<Omit<DbSyncState, 'id' | 'updated_at'>>
 
 // Query result types with joined data
 export interface FriendWithTags extends DbFriend {

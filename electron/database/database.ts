@@ -19,6 +19,8 @@ import type {
   DbShareContentUpdate,
   DbShareCategory,
   DbShareCategoryInsert,
+  DbSyncState,
+  DbSyncStateUpdate,
   FriendWithTags
 } from './models'
 
@@ -219,6 +221,18 @@ CREATE INDEX IF NOT EXISTS idx_message_logs_recipient ON message_logs(recipient_
 CREATE INDEX IF NOT EXISTS idx_message_logs_sent_at ON message_logs(sent_at);
 CREATE INDEX IF NOT EXISTS idx_share_content_category ON share_content(category_id);
 
+CREATE TABLE IF NOT EXISTS sync_state (
+    id TEXT PRIMARY KEY DEFAULT 'global',
+    account_id TEXT,
+    friends_syncing BOOLEAN NOT NULL DEFAULT 0,
+    friends_progress INTEGER NOT NULL DEFAULT 0,
+    friends_message TEXT,
+    groups_syncing BOOLEAN NOT NULL DEFAULT 0,
+    groups_progress INTEGER NOT NULL DEFAULT 0,
+    groups_message TEXT,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TRIGGER IF NOT EXISTS update_accounts_timestamp
 AFTER UPDATE ON accounts
 BEGIN
@@ -258,6 +272,28 @@ END;
       account.last_login
     )
     return this.getAccount(account.id)!
+  }
+
+  getAccountByPhone(phone: string): DbAccount | undefined {
+    const stmt = this.db.prepare('SELECT * FROM accounts WHERE phone = ?')
+    return stmt.get(phone) as DbAccount | undefined
+  }
+
+  upsertAccount(account: DbAccountInsert): DbAccount {
+    const existing = this.getAccountByPhone(account.phone)
+    if (existing) {
+      // Update existing account with new credentials
+      const updates: DbAccountUpdate = {
+        name: account.name,
+        imei: account.imei,
+        cookie: account.cookie,
+        user_agent: account.user_agent,
+        status: account.status,
+        last_login: account.last_login
+      }
+      return this.updateAccount(existing.id, updates)!
+    }
+    return this.createAccount(account)
   }
 
   getAccount(id: string): DbAccount | undefined {
@@ -610,6 +646,63 @@ END;
     const stmt = this.db.prepare('DELETE FROM share_categories WHERE id = ?')
     const result = stmt.run(id)
     return result.changes > 0
+  }
+
+  // ==================== SYNC STATE ====================
+
+  getSyncState(): DbSyncState | undefined {
+    const stmt = this.db.prepare('SELECT * FROM sync_state WHERE id = ?')
+    return stmt.get('global') as DbSyncState | undefined
+  }
+
+  updateSyncState(updates: DbSyncStateUpdate): DbSyncState {
+    const existing = this.getSyncState()
+    if (!existing) {
+      // Create new record
+      const stmt = this.db.prepare(`
+        INSERT INTO sync_state (id, account_id, friends_syncing, friends_progress, friends_message, groups_syncing, groups_progress, groups_message)
+        VALUES ('global', ?, ?, ?, ?, ?, ?, ?)
+      `)
+      stmt.run(
+        updates.account_id ?? null,
+        updates.friends_syncing ? 1 : 0,
+        updates.friends_progress ?? 0,
+        updates.friends_message ?? null,
+        updates.groups_syncing ? 1 : 0,
+        updates.groups_progress ?? 0,
+        updates.groups_message ?? null
+      )
+    } else {
+      // Update existing
+      const fields: string[] = []
+      const values: any[] = []
+
+      if (updates.account_id !== undefined) { fields.push('account_id = ?'); values.push(updates.account_id) }
+      if (updates.friends_syncing !== undefined) { fields.push('friends_syncing = ?'); values.push(updates.friends_syncing ? 1 : 0) }
+      if (updates.friends_progress !== undefined) { fields.push('friends_progress = ?'); values.push(updates.friends_progress) }
+      if (updates.friends_message !== undefined) { fields.push('friends_message = ?'); values.push(updates.friends_message) }
+      if (updates.groups_syncing !== undefined) { fields.push('groups_syncing = ?'); values.push(updates.groups_syncing ? 1 : 0) }
+      if (updates.groups_progress !== undefined) { fields.push('groups_progress = ?'); values.push(updates.groups_progress) }
+      if (updates.groups_message !== undefined) { fields.push('groups_message = ?'); values.push(updates.groups_message) }
+
+      if (fields.length > 0) {
+        fields.push('updated_at = CURRENT_TIMESTAMP')
+        const stmt = this.db.prepare(`UPDATE sync_state SET ${fields.join(', ')} WHERE id = 'global'`)
+        stmt.run(...values)
+      }
+    }
+    return this.getSyncState()!
+  }
+
+  resetSyncState(): void {
+    const stmt = this.db.prepare(`
+      UPDATE sync_state SET 
+        friends_syncing = 0, friends_progress = 0, friends_message = NULL,
+        groups_syncing = 0, groups_progress = 0, groups_message = NULL,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = 'global'
+    `)
+    stmt.run()
   }
 
   // ==================== UTILITIES ====================

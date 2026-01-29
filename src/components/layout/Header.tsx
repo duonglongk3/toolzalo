@@ -15,6 +15,7 @@ import { Button, Input, Badge } from '@/components/ui'
 import { useAppStore } from '@/store'
 import { cn } from '@/utils'
 import { useNavigate } from 'react-router-dom'
+import { useI18n } from '@/i18n'
 import toast from 'react-hot-toast'
 
 interface HeaderProps {
@@ -28,8 +29,9 @@ const Header: React.FC<HeaderProps> = ({
   sidebarCollapsed = false,
   onAddAccount
 }) => {
-  const { notifications } = useAppStore()
+  const { notifications, config } = useAppStore()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [searchQuery, setSearchQuery] = React.useState('')
   const [showNotifications, setShowNotifications] = React.useState(false)
   
@@ -150,29 +152,29 @@ const Header: React.FC<HeaderProps> = ({
   const handleCheckUpdate = async () => {
     const api = (window as any).electronAPI
     if (!api?.updater) {
-      toast.error('Tính năng cập nhật không khả dụng')
+      toast.error(t('settings.updateUnavailable'))
       return
     }
     
     setUpdateStatus('checking')
-    toast.loading('Đang kiểm tra cập nhật...', { id: 'check-update' })
+    toast.loading(t('settings.checkingUpdate'), { id: 'check-update' })
     
     try {
       const result = await api.updater.checkForUpdates()
       toast.dismiss('check-update')
       
       if (!result.success) {
-        toast.error(`Lỗi: ${result.error}`)
+        toast.error(`${t('common.error')}: ${result.error}`)
         setUpdateStatus('idle')
       } else if (result.updateInfo?.version) {
         // Update available - status will be set by event listener
       } else {
-        toast.success('Bạn đang sử dụng phiên bản mới nhất!')
+        toast.success(t('settings.updateNotAvailable'))
         setUpdateStatus('idle')
       }
     } catch (error) {
       toast.dismiss('check-update')
-      toast.error('Không thể kiểm tra cập nhật')
+      toast.error(t('settings.updateUnavailable'))
       setUpdateStatus('idle')
     }
   }
@@ -181,19 +183,19 @@ const Header: React.FC<HeaderProps> = ({
     const api = (window as any).electronAPI
     if (!api?.updater) return
     
-    toast.loading('Đang tải bản cập nhật...', { id: 'download-update' })
+    toast.loading(t('common.loading'), { id: 'download-update' })
     
     try {
       const result = await api.updater.downloadUpdate()
       toast.dismiss('download-update')
       
       if (!result.success) {
-        toast.error(`Lỗi tải: ${result.error}`)
+        toast.error(`${t('common.error')}: ${result.error}`)
         setUpdateStatus('available')
       }
     } catch (error) {
       toast.dismiss('download-update')
-      toast.error('Không thể tải bản cập nhật')
+      toast.error(t('common.error'))
       setUpdateStatus('available')
     }
   }
@@ -202,7 +204,7 @@ const Header: React.FC<HeaderProps> = ({
     const api = (window as any).electronAPI
     if (!api?.updater) return
     
-    if (window.confirm('Ứng dụng sẽ khởi động lại để cài đặt bản cập nhật. Bạn có muốn tiếp tục?')) {
+    if (window.confirm(t('common.confirm'))) {
       api.updater.installUpdate()
     }
   }
@@ -301,7 +303,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <Input
               type="text"
-              placeholder="Tìm kiếm tài khoản, bạn bè, nhóm..."
+              placeholder={t('header.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               leftIcon={<Search className="w-4 h-4" />}
@@ -321,7 +323,7 @@ const Header: React.FC<HeaderProps> = ({
             onClick={handleNewAccount}
             icon={<Plus className="w-4 h-4" />}
           >
-            Tài khoản mới
+            {t('accounts.addAccount')}
           </Button>
           
           <Button
@@ -329,7 +331,7 @@ const Header: React.FC<HeaderProps> = ({
             size="sm"
             onClick={handleImportData}
             icon={<Upload className="w-4 h-4" />}
-            title="Import dữ liệu"
+            title={t('common.import')}
           />
           
           <Button
@@ -337,7 +339,7 @@ const Header: React.FC<HeaderProps> = ({
             size="sm"
             onClick={handleExportData}
             icon={<Download className="w-4 h-4" />}
-            title="Export dữ liệu"
+            title={t('common.export')}
           />
         </div>
 
@@ -370,7 +372,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-large border border-secondary-200 z-50">
               <div className="p-4 border-b border-secondary-200">
                 <h3 className="text-sm font-semibold text-secondary-900">
-                  Thông báo
+                  {t('header.notifications')}
                 </h3>
               </div>
               
@@ -397,7 +399,7 @@ const Header: React.FC<HeaderProps> = ({
                             {notification.message}
                           </p>
                           <p className="text-xs text-secondary-400 mt-1">
-                            {new Date(notification.createdAt).toLocaleTimeString('vi-VN')}
+                            {new Date(notification.createdAt).toLocaleTimeString(config.language === 'vi' ? 'vi-VN' : 'en-US')}
                           </p>
                         </div>
                       </div>
@@ -407,7 +409,7 @@ const Header: React.FC<HeaderProps> = ({
                   <div className="p-8 text-center">
                     <Bell className="w-8 h-8 text-secondary-400 mx-auto mb-2" />
                     <p className="text-sm text-secondary-500">
-                      Không có thông báo mới
+                      {t('header.noNotifications')}
                     </p>
                   </div>
                 )}
@@ -420,7 +422,7 @@ const Header: React.FC<HeaderProps> = ({
                     size="sm"
                     className="w-full"
                   >
-                    Xem tất cả thông báo
+                    {t('common.all')}
                   </Button>
                 </div>
               )}

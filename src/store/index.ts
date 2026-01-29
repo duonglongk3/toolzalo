@@ -12,17 +12,37 @@ import type {
 } from '@/types'
 
 // Storage: persist to JSON files via Electron IPC; fallback to localStorage in web
-const fileStorage = createJSONStorage(() => {
+const fileStorage = createJSONStorage<any>(() => {
   const api = (typeof window !== 'undefined' ? (window as any).electronAPI : undefined)
   if (!api || !api.data) {
     // fallback for non-Electron contexts
     return localStorage
   }
   return {
-    getItem: (name: string) => api.data.read(`${name}.json`),
-    setItem: (name: string, value: string) => api.data.write(`${name}.json`, value),
-    removeItem: (name: string) => api.data.remove(`${name}.json`),
-  } as any
+    getItem: async (name: string): Promise<string | null> => {
+      try {
+        const result = await api.data.read(`${name}.json`)
+        return result ?? null
+      } catch (e) {
+        console.error('fileStorage getItem error:', e)
+        return null
+      }
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      try {
+        await api.data.write(`${name}.json`, value)
+      } catch (e) {
+        console.error('fileStorage setItem error:', e)
+      }
+    },
+    removeItem: async (name: string): Promise<void> => {
+      try {
+        await api.data.remove(`${name}.json`)
+      } catch (e) {
+        console.error('fileStorage removeItem error:', e)
+      }
+    },
+  }
 })
 
 // Account Store
@@ -313,6 +333,161 @@ export const useTemplateStore = create<TemplatesState>()(
       }
     ),
     { name: 'TemplatesStore' }
+  )
+)
+
+// Sync Store - Global sync state management (persisted to database)
+interface SyncState {
+  // Friends sync
+  friendsSyncing: boolean
+  friendsSyncProgress: number // 0-100
+  friendsSyncMessage: string
+  // Groups sync
+  groupsSyncing: boolean
+  groupsSyncProgress: number // 0-100
+  groupsSyncMessage: string
+  // Initialized flag
+  _initialized: boolean
+  // Actions
+  initFromDb: () => Promise<void>
+  startFriendsSync: () => void
+  updateFriendsSync: (progress: number, message: string) => void
+  finishFriendsSync: () => void
+  startGroupsSync: () => void
+  updateGroupsSync: (progress: number, message: string) => void
+  finishGroupsSync: () => void
+}
+
+// Helper to persist sync state to database
+const persistSyncToDb = async (updates: {
+  friends_syncing?: boolean
+  friends_progress?: number
+  friends_message?: string | null
+  groups_syncing?: boolean
+  groups_progress?: number
+  groups_message?: string | null
+}) => {
+  try {
+    const api = (typeof window !== 'undefined' ? (window as any).electronAPI : undefined)
+    if (api?.db?.updateSyncState) {
+      await api.db.updateSyncState(updates)
+    }
+  } catch (e) {
+    console.error('Failed to persist sync state to db:', e)
+  }
+}
+
+export const useSyncStore = create<SyncState>()(
+  devtools(
+    (set, get) => ({
+      friendsSyncing: false,
+      friendsSyncProgress: 0,
+      friendsSyncMessage: '',
+      groupsSyncing: false,
+      groupsSyncProgress: 0,
+      groupsSyncMessage: '',
+      _initialized: false,
+
+      initFromDb: async () => {
+        if (get()._initialized) return
+        try {
+          const api = (typeof window !== 'undefined' ? (window as any).electronAPI : undefined)
+          if (api?.db?.getSyncState) {
+            const dbState = await api.db.getSyncState()
+            if (dbState) {
+              set({
+                friendsSyncing: !!dbState.friends_syncing,
+                friendsSyncProgress: dbState.friends_progress || 0,
+                friendsSyncMessage: dbState.friends_message || '',
+                groupsSyncing: !!dbState.groups_syncing,
+                groupsSyncProgress: dbState.groups_progress || 0,
+                groupsSyncMessage: dbState.groups_message || '',
+                _initialized: true,
+              })
+              return
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load sync state from db:', e)
+        }
+        set({ _initialized: true })
+      },
+
+      startFriendsSync: () => {
+        set({
+          friendsSyncing: true,
+          friendsSyncProgress: 0,
+          friendsSyncMessage: 'Đang đồng bộ bạn bè...'
+        })
+        persistSyncToDb({
+          friends_syncing: true,
+          friends_progress: 0,
+          friends_message: 'Đang đồng bộ bạn bè...'
+        })
+      },
+
+      updateFriendsSync: (progress, message) => {
+        set({
+          friendsSyncProgress: progress,
+          friendsSyncMessage: message
+        })
+        persistSyncToDb({
+          friends_progress: progress,
+          friends_message: message
+        })
+      },
+
+      finishFriendsSync: () => {
+        set({
+          friendsSyncing: false,
+          friendsSyncProgress: 100,
+          friendsSyncMessage: ''
+        })
+        persistSyncToDb({
+          friends_syncing: false,
+          friends_progress: 100,
+          friends_message: null
+        })
+      },
+
+      startGroupsSync: () => {
+        set({
+          groupsSyncing: true,
+          groupsSyncProgress: 0,
+          groupsSyncMessage: 'Đang đồng bộ nhóm...'
+        })
+        persistSyncToDb({
+          groups_syncing: true,
+          groups_progress: 0,
+          groups_message: 'Đang đồng bộ nhóm...'
+        })
+      },
+
+      updateGroupsSync: (progress, message) => {
+        set({
+          groupsSyncProgress: progress,
+          groupsSyncMessage: message
+        })
+        persistSyncToDb({
+          groups_progress: progress,
+          groups_message: message
+        })
+      },
+
+      finishGroupsSync: () => {
+        set({
+          groupsSyncing: false,
+          groupsSyncProgress: 100,
+          groupsSyncMessage: ''
+        })
+        persistSyncToDb({
+          groups_syncing: false,
+          groups_progress: 100,
+          groups_message: null
+        })
+      },
+    }),
+    { name: 'SyncStore' }
   )
 )
 

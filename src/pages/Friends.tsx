@@ -17,8 +17,8 @@ const Friends: React.FC = () => {
   const [selectedTag, setSelectedTag] = React.useState<string>('')
   const [loading, setLoading] = React.useState(false)
   const [labels, setLabels] = React.useState<Array<{ id: number; text: string; conversations: string[] }>>([])
-  // Không hiển thị danh sách cho đến khi bấm Đồng bộ
-  const [showList, setShowList] = React.useState(false)
+  // Hiển thị danh sách nếu đã có friends (persist từ store)
+  const showList = friends.length > 0
   // Trạng thái tiến trình thêm bạn hàng loạt
   const [bulkRunning, setBulkRunning] = React.useState(false)
   const [bulkPhase, setBulkPhase] = React.useState<'idle'|'resolve'|'send'>('idle')
@@ -32,8 +32,10 @@ const Friends: React.FC = () => {
 
   // Form states
   const [phoneNumber, setPhoneNumber] = React.useState('')
+  const [friendMessage, setFriendMessage] = React.useState('Xin chào, mình muốn kết bạn với bạn!')
   const [bulkPhones, setBulkPhones] = React.useState('')
   const [bulkUserIds, setBulkUserIds] = React.useState('')
+  const [bulkMessage, setBulkMessage] = React.useState('Xin chào, mình muốn kết bạn với bạn!')
   // Đơn vị hiển thị: giây; lưu/convert khi gọi API -> ms
   const [bulkDelaySec, setBulkDelaySec] = React.useState<string>('30')
 
@@ -131,7 +133,6 @@ const Friends: React.FC = () => {
       // Thay thế toàn bộ danh sách từ Zalo (tránh trùng lặp do id cũ tạo ngẫu nhiên)
       setFriends(friendsList)
 
-      setShowList(true)
       // Sau khi đồng bộ bạn bè, đồng bộ nhãn -> tag
       const res = await zaloService.getLabels()
       if (res) {
@@ -160,7 +161,7 @@ const Friends: React.FC = () => {
 
     setLoading(true)
     try {
-      const success = await zaloService.addFriend(phoneNumber.trim())
+      const success = await zaloService.addFriend(phoneNumber.trim(), friendMessage.trim())
 
       if (success) {
         // Add to local store
@@ -228,7 +229,7 @@ const Friends: React.FC = () => {
         phoneNumbers,
         userIds,
         delayMs,
-        '',
+        bulkMessage.trim(),
         (p) => {
           if (p.phase === 'resolve') {
             setBulkPhase('resolve')
@@ -516,6 +517,20 @@ const Friends: React.FC = () => {
             required
           />
 
+          <div>
+            <label htmlFor="friendMessage" className="block text-sm font-medium text-secondary-700 mb-2">
+              Nội dung lời mời
+            </label>
+            <textarea
+              id="friendMessage"
+              value={friendMessage}
+              onChange={(e) => setFriendMessage(e.target.value)}
+              placeholder="Xin chào, mình muốn kết bạn với bạn!"
+              rows={3}
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
           <div className="flex items-center justify-end space-x-3">
             <Button
               variant="outline"
@@ -556,6 +571,21 @@ const Friends: React.FC = () => {
             </div>
           )}
 
+          <div>
+            <label htmlFor="bulkMessage" className="block text-sm font-medium text-secondary-700 mb-2">
+              Nội dung lời mời (áp dụng cho tất cả)
+            </label>
+            <textarea
+              id="bulkMessage"
+              value={bulkMessage}
+              onChange={(e) => setBulkMessage(e.target.value)}
+              placeholder="Xin chào, mình muốn kết bạn với bạn!"
+              rows={2}
+              disabled={bulkRunning}
+              className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="bulkPhones" className="block text-sm font-medium text-secondary-700 mb-2">
@@ -565,7 +595,7 @@ const Friends: React.FC = () => {
                 value={bulkPhones}
                 onChange={(e) => setBulkPhones(e.target.value)}
                 placeholder="0123456789&#10;0987654321&#10;..."
-                rows={10}
+                rows={8}
                 disabled={bulkRunning}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
               />
@@ -578,7 +608,7 @@ const Friends: React.FC = () => {
                 value={bulkUserIds}
                 onChange={(e) => setBulkUserIds(e.target.value)}
                 placeholder="1234567890123456789&#10;9876543210987654321&#10;..."
-                rows={10}
+                rows={8}
                 disabled={bulkRunning}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
               />

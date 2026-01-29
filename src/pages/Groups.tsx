@@ -1,15 +1,20 @@
 import React from 'react'
 import { Plus, Search, Download, Users, LogOut, Eye, UserPlus, Crown, Shield, Copy } from 'lucide-react'
 import { Button, Card, CardContent, Badge, Modal, Input, Textarea } from '@/components/ui'
-import { useGroupsStore } from '@/store'
+import { useGroupsStore, useSyncStore } from '@/store'
 import { useAccountStore } from '@/store/database-store'
 import { formatRelativeTime, cn } from '@/utils'
 import { zaloService } from '@/services'
 import type { ZaloGroup } from '@/types'
 import toast from 'react-hot-toast'
 
+// Global sync state - persists across component unmounts
+let globalSyncAbortController: AbortController | null = null
+let globalEnrichedMap: Record<string, ZaloGroup> = {}
+
 const Groups: React.FC = () => {
   const { groups, setGroups, deleteGroup, updateGroup } = useGroupsStore()
+  const { groupsSyncing, groupsSyncProgress, groupsSyncMessage, startGroupsSync, updateGroupsSync, finishGroupsSync } = useSyncStore()
 
   const { activeAccount } = useAccountStore()
   const [showJoinModal, setShowJoinModal] = React.useState(false)
@@ -18,6 +23,7 @@ const Groups: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState('')
   const [loading, setLoading] = React.useState(false)
   const [joinLink, setJoinLink] = React.useState('')
+  const [joinDelay, setJoinDelay] = React.useState('30')
   const [addUserInput, setAddUserInput] = React.useState('')
   const [addUserType, setAddUserType] = React.useState<'phone' | 'userid'>('phone')
   const [filterType, setFilterType] = React.useState<'all' | 'admin' | 'member'>('all')
@@ -49,8 +55,18 @@ const Groups: React.FC = () => {
     return result
   }, [groups, debouncedQuery, filterType])
 
+  // Ref to access setGroups in sync function without stale closure
+  const setGroupsRef = React.useRef(setGroups)
+  setGroupsRef.current = setGroups
+
   const handleSyncGroups = async () => {
     console.log('🔥 handleSyncGroups called!')
+
+    // Nếu đang sync rồi thì không làm gì
+    if (groupsSyncing) {
+      toast('Đang đồng bộ...', { icon: '⏳' })
+      return
+    }
 
     if (!activeAccount) {
       console.log('🔥 No active account')
@@ -65,9 +81,13 @@ const Groups: React.FC = () => {
     }
 
     console.log('🔥 Starting sync groups...')
-    setLoading(true)
-    // Xoá danh sách hiện tại để tránh còn sót placeholder từ lần trước
-    setGroups([])
+    startGroupsSync()
+    
+    // Reset global state for new sync
+    globalEnrichedMap = {}
+    globalSyncAbortController = new AbortController()
+    const signal = globalSyncAbortController.signal
+    
     try {
       // Bước 1: chỉ lấy danh sách ID nhóm (placeholder)
       const baseGroups = await zaloService.getAllGroups()
@@ -85,7 +105,7 @@ const Groups: React.FC = () => {
           name,
           description: info?.description ?? '',
           memberCount: Number.isFinite(info?.memberCount) ? info.memberCount : 0,
-          isAdmin: info?.isAdmin ?? false, // Sử dụng isAdmin từ service layer
+          isAdmin: info?.isAdmin ?? false,
           avatar: info?.avatar ?? '',
           joinedAt: ph?.joinedAt || new Date(),
           type: ph?.type || 'private',
@@ -93,15 +113,22 @@ const Groups: React.FC = () => {
       }
       const isValid = (info: any) => !!(info && String(info.name || '').trim().length > 0)
 
-      // Enrich theo lô 20 nhóm/lần; retry tối đa 2 vòng; fallback gọi đơn từng id
+      // Update groups using ref to avoid stale closure
+      const updateGlobalGroups = () => {
+        const groupsList = Object.values(globalEnrichedMap)
+        setGroupsRef.current(groupsList)
+      }
+
+      // Enrich theo lô 20 nhóm/lần
       const batchSize = 20
-      const enrichedMap: Record<string, ZaloGroup> = {}
 
       const runBatch = async (batch: string[], delayMs: number) => {
+        if (signal.aborted) return batch
+        
         try {
-          // Sử dụng getGroupInfo từ service layer để có logic isAdmin đúng
           const results = await Promise.all(
             batch.map(async (id) => {
+              if (signal.aborted) return { id, info: null }
               try {
                 const info = await (zaloService as any).getGroupInfo(id)
                 return { id, info }
@@ -115,12 +142,12 @@ const Groups: React.FC = () => {
           const failed: string[] = []
           for (const { id, info } of results) {
             if (isValid(info)) {
-              enrichedMap[id] = toGroup(id, info)
+              globalEnrichedMap[id] = toGroup(id, info)
             } else {
               failed.push(id)
             }
           }
-          setGroups(Object.values(enrichedMap))
+          updateGlobalGroups()
           await sleep(delayMs)
           return failed
         } catch (e) {
@@ -132,17 +159,18 @@ const Groups: React.FC = () => {
 
       // Vòng 0: quét toàn bộ
       let pending = ids.slice(0)
-      for (let i = 0; i < pending.length; i += batchSize) {
+      for (let i = 0; i < pending.length && !signal.aborted; i += batchSize) {
         const batch = pending.slice(i, i + batchSize)
         const failed = await runBatch(batch, 250)
         // Fallback đơn lẻ cho những id fail của batch này
         const still: string[] = []
         for (const id of failed) {
+          if (signal.aborted) break
           try {
             const info = await (zaloService as any).getGroupInfo(id)
             if (isValid(info)) {
-              enrichedMap[id] = toGroup(id, info)
-              setGroups(Object.values(enrichedMap))
+              globalEnrichedMap[id] = toGroup(id, info)
+              updateGlobalGroups()
             } else {
               still.push(id)
             }
@@ -155,9 +183,9 @@ const Groups: React.FC = () => {
       }
 
       // Retry thêm 2 vòng cho những id còn lại
-      for (let pass = 1; pass <= 2 && pending.length > 0; pass++) {
+      for (let pass = 1; pass <= 2 && pending.length > 0 && !signal.aborted; pass++) {
         const next: string[] = []
-        for (let i = 0; i < pending.length; i += batchSize) {
+        for (let i = 0; i < pending.length && !signal.aborted; i += batchSize) {
           const batch = pending.slice(i, i + batchSize)
           const failed = await runBatch(batch, 350 + pass * 150)
           next.push(...failed)
@@ -165,19 +193,22 @@ const Groups: React.FC = () => {
         pending = next
       }
 
-      const okCount = Object.keys(enrichedMap).length
-      const adminCount = Object.values(enrichedMap).filter(g => g.isAdmin).length
-      const memberCount = okCount - adminCount
+      if (!signal.aborted) {
+        const okCount = Object.keys(globalEnrichedMap).length
+        const adminCount = Object.values(globalEnrichedMap).filter(g => g.isAdmin).length
+        const memberCount = okCount - adminCount
 
-      toast.success(
-        `Đã đồng bộ ${okCount}/${ids.length} nhóm • ${adminCount} admin • ${memberCount} thành viên`,
-        { duration: 4000 }
-      )
+        toast.success(
+          `Đã đồng bộ ${okCount}/${ids.length} nhóm • ${adminCount} admin • ${memberCount} thành viên`,
+          { duration: 4000 }
+        )
+      }
     } catch (error) {
       console.error('🔥 Sync groups error:', error)
       toast.error('Lỗi đồng bộ danh sách nhóm')
     } finally {
-      setLoading(false)
+      globalSyncAbortController = null
+      finishGroupsSync()
     }
   }
 
@@ -260,34 +291,21 @@ const Groups: React.FC = () => {
 
     setLoading(true)
     try {
-      // Hỗ trợ nhiều link: tách theo xuống dòng, dấu phẩy, chấm phẩy và khoảng trắng
-      // Hỗ trợ cấu hình delay qua token "delay=ms" trong nội dung (ví dụ: delay=1200)
-      const tokens = Array.from(new Set(
-        joinLink
-          .split(/[\n,;\s]+/)
-          .map(s => s.trim())
-          .filter(Boolean)
-      ))
-
-      let delayMs = 30000 // mặc định 30s giữa các lần join để tránh rate limit
-      const links: string[] = []
-      for (const t of tokens) {
-        const m = t.match(/^delay=(\d{1,6})(s)?$/i)
-        if (m) {
-          const v = parseInt(m[1], 10)
-          // Nếu có hậu tố 's' hoặc không có, coi như giây -> đổi sang ms
-          const sec = isNaN(v) ? 30 : v
-          delayMs = Math.max(0, Math.min(600000, sec * 1000))
-        } else {
-          links.push(t)
-        }
-      }
+      // Tách link theo dòng (mỗi dòng 1 link)
+      const links = joinLink
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s && s.startsWith('http'))
 
       if (links.length === 0) {
-        toast.error('Vui lòng nhập link tham gia nhóm')
+        toast.error('Vui lòng nhập link tham gia nhóm (mỗi dòng 1 link)')
         setLoading(false)
         return
       }
+
+      // Lấy delay từ input (giây -> ms)
+      const delaySec = parseInt(joinDelay, 10) || 30
+      const delayMs = Math.max(0, Math.min(600, delaySec)) * 1000
 
       if (links.length === 1) {
         const ok = await zaloService.joinGroup(links[0])
@@ -297,15 +315,23 @@ const Groups: React.FC = () => {
           toast.error('Không thể tham gia nhóm. Vui lòng kiểm tra link.')
         }
       } else {
+        // Hiển thị toast progress
+        const progressId = toast.loading(`Đang tham gia ${links.length} nhóm (delay ${delaySec}s)...`)
+        
         const result = await zaloService.joinGroups(links, delayMs)
         const { joined, already, pending, failed } = result
+        
+        toast.dismiss(progressId)
+        
         const summary = [
           joined.length ? `Thành công: ${joined.length}` : '',
           already.length ? `Đã là thành viên: ${already.length}` : '',
           pending.length ? `Chờ duyệt: ${pending.length}` : '',
           failed.length ? `Lỗi: ${failed.length}` : '',
         ].filter(Boolean).join(' · ')
-        toast.success(`Đã xử lý ${links.length} link (delay ${delayMs}ms). ${summary}`)
+        
+        toast.success(`Đã xử lý ${links.length} nhóm. ${summary}`, { duration: 5000 })
+        
         if (failed.length > 0) {
           console.warn('Join group failed items:', failed)
         }
@@ -358,11 +384,25 @@ const Groups: React.FC = () => {
 
   const handleCopyGroupInfo = async (group: ZaloGroup) => {
     try {
+      // Lấy link nhóm nếu có
+      let groupLink = ''
+      try {
+        const electronAPI = (window as any).electronAPI
+        if (electronAPI?.zalo?.getGroupLinkDetail) {
+          const linkRes = await electronAPI.zalo.getGroupLinkDetail(group.id)
+          if (linkRes?.success && linkRes?.info?.link && linkRes?.info?.enabled) {
+            groupLink = linkRes.info.link
+          }
+        }
+      } catch (e) {
+        console.warn('Could not get group link:', e)
+      }
+
       const groupInfo = `Tên nhóm: ${group.name}
 ID nhóm: ${group.id}
 Số thành viên: ${group.memberCount}
 Vai trò: ${group.isAdmin ? 'Admin' : 'Thành viên'}
-Loại nhóm: ${group.type === 'public' ? 'Công khai' : 'Riêng tư'}${group.description ? `\nMô tả: ${group.description}` : ''}
+Loại nhóm: ${group.type === 'public' ? 'Công khai' : 'Riêng tư'}${groupLink ? `\nLink nhóm: ${groupLink}` : ''}${group.description ? `\nMô tả: ${group.description}` : ''}
 Tham gia: ${formatRelativeTime(group.joinedAt)}`
 
       try {
@@ -545,16 +585,25 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
         // Dismiss progress toast
         toast.dismiss('add-userids-progress')
 
+        // Kiểm tra method được sử dụng (invite = gửi lời mời, add = thêm trực tiếp)
+        const isInviteMethod = (result as any).method === 'invite'
+        const actionWord = isInviteMethod ? 'mời' : 'thêm'
+        const actionWordPast = isInviteMethod ? 'Đã gửi lời mời đến' : 'Đã thêm thành công'
+
         if (result.success) {
           const added = userIds.length - (result.errorMembers?.length || 0)
           const failed = result.errorMembers?.length || 0
 
           if (added > 0 && failed > 0) {
-            toast.success(`✅ Đã thêm ${added}/${userIds.length} người dùng. ${failed} thất bại.`, { duration: 4000 })
+            toast.success(`✅ ${actionWordPast} ${added}/${userIds.length} người dùng. ${failed} thất bại.`, { duration: 4000 })
           } else if (added > 0) {
-            toast.success(`✅ Đã thêm thành công ${added} người dùng vào nhóm`)
+            if (isInviteMethod) {
+              toast.success(`✅ Đã gửi lời mời đến ${added} người dùng. Họ cần chấp nhận để vào nhóm.`, { duration: 5000 })
+            } else {
+              toast.success(`✅ Đã thêm thành công ${added} người dùng vào nhóm`)
+            }
           } else {
-            toast.error(`❌ Không thể thêm người dùng nào. ${failed} thất bại.`)
+            toast.error(`❌ Không thể ${actionWord} người dùng nào. ${failed} thất bại.`)
           }
 
           if (result.errorMembers && result.errorMembers.length > 0) {
@@ -567,16 +616,16 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
           // Check for "not friends" error
           if ((result as any).notFriendUsers && (result as any).notFriendUsers.length > 0) {
             const notFriendUsers = (result as any).notFriendUsers as string[]
-            toast.error(`⚠️ ${notFriendUsers.length} người dùng cần kết bạn trước khi thêm vào nhóm`, { duration: 8000 })
+            toast.error(`⚠️ ${notFriendUsers.length} người dùng cần kết bạn trước khi ${actionWord} vào nhóm`, { duration: 8000 })
             console.log('Not friend users:', notFriendUsers)
           }
         } else {
           // Check if error is due to "not friends"
-          if (result.error?.includes('kết bạn')) {
+          if (result.error?.includes('kết bạn') || result.error?.includes('bạn bè')) {
             toast.error('⚠️ ' + result.error, { duration: 8000 })
             toast('💡 Gợi ý: Gửi lời mời kết bạn trước, sau đó thử lại', { duration: 10000, icon: '💡' })
           } else {
-            toast.error(result.error || '❌ Không thể thêm người dùng vào nhóm')
+            toast.error(result.error || `❌ Không thể ${actionWord} người dùng vào nhóm`)
           }
         }
       }
@@ -624,10 +673,10 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
           <Button
             variant="outline"
             onClick={handleSyncGroups}
-            loading={loading}
+            loading={groupsSyncing}
             icon={<Download className="w-4 h-4" />}
           >
-            Đồng bộ
+            {groupsSyncing ? 'Đang đồng bộ...' : 'Đồng bộ'}
           </Button>
           <Button
             onClick={() => setShowJoinModal(true)}
@@ -818,17 +867,20 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
                   >
                     Xem thành viên
                   </Button>
-                  {group.isAdmin && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleShowAddUserModal(group)}
-                      className="p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 border-primary-200 hover:border-primary-300 transition-all duration-200"
-                      title="Thêm thành viên"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleShowAddUserModal(group)}
+                    className={cn(
+                      "p-2 transition-all duration-200",
+                      group.isAdmin 
+                        ? "text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 border-primary-200 hover:border-primary-300"
+                        : "text-info-600 hover:text-info-700 hover:bg-info-50 dark:hover:bg-info-900/20 border-info-200 hover:border-info-300"
+                    )}
+                    title={group.isAdmin ? "Thêm thành viên (Admin)" : "Mời bạn bè vào nhóm"}
+                  >
+                    <UserPlus className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -913,29 +965,59 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
       <Modal
         open={showJoinModal}
         onClose={() => setShowJoinModal(false)}
-        title="Tham gia nhóm"
+        title="Tham gia nhóm hàng loạt"
+        size="lg"
       >
         <div className="space-y-4">
-          <Input
-            label="Link tham gia nhóm"
-            placeholder="https://zalo.me/g/..."
+          <Textarea
+            label="Danh sách link nhóm"
+            placeholder={`Mỗi dòng 1 link nhóm:\nhttps://zalo.me/g/abc123\nhttps://zalo.me/g/xyz456\nhttps://zalo.me/g/...`}
             value={joinLink}
             onChange={(e) => setJoinLink(e.target.value)}
+            rows={8}
             required
           />
 
-          <div className="text-sm text-secondary-600">
-            <p className="mb-2">Hướng dẫn lấy link tham gia nhóm:</p>
+          {/* Delay config */}
+          <div className="flex items-center space-x-3">
+            <label className="text-sm font-medium text-secondary-700 dark:text-secondary-300 whitespace-nowrap">
+              Delay giữa mỗi lần join:
+            </label>
+            <Input
+              type="number"
+              min={0}
+              max={600}
+              placeholder="30"
+              value={joinDelay}
+              onChange={(e) => setJoinDelay(e.target.value)}
+              className="w-24"
+            />
+            <span className="text-sm text-secondary-500">giây (0-600)</span>
+          </div>
+
+          {/* Stats */}
+          {joinLink.trim() && (
+            <div className="text-sm text-secondary-600 dark:text-secondary-400 bg-secondary-50 dark:bg-secondary-800 p-3 rounded-lg">
+              <span className="font-medium">
+                {joinLink.split('\n').filter(l => l.trim() && l.trim().startsWith('http')).length} link
+              </span>
+              {' '}sẽ được xử lý với delay{' '}
+              <span className="font-medium">{joinDelay || 30} giây</span>
+              {' '}giữa mỗi lần join
+            </div>
+          )}
+
+          <div className="text-sm text-secondary-600 dark:text-secondary-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
+            <p className="font-medium mb-2">Hướng dẫn:</p>
             <ol className="list-decimal list-inside space-y-1 text-xs">
               <li>Mở nhóm Zalo trên điện thoại</li>
               <li>Chọn "Thông tin nhóm" → "Mời bạn bè"</li>
               <li>Chọn "Sao chép link" và dán vào đây</li>
+              <li>Mỗi dòng 1 link nhóm</li>
             </ol>
-            <p className="mt-2 text-xs">Có thể dán nhiều link và phân tách bằng dấu phẩy, chấm phẩy, khoảng trắng hoặc xuống dòng.</p>
-            <p className="text-xs">Tùy chọn: thêm "delay=30s" để giãn cách 30 giây giữa mỗi lần tham gia nhóm (0–600s).</p>
           </div>
 
-          <div className="flex items-center justify-end space-x-3">
+          <div className="flex items-center justify-end space-x-3 pt-2">
             <Button
               variant="outline"
               onClick={() => setShowJoinModal(false)}
@@ -946,7 +1028,7 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
               onClick={handleJoinGroup}
               loading={loading}
             >
-              Tham gia
+              Tham gia {joinLink.split('\n').filter(l => l.trim() && l.trim().startsWith('http')).length > 1 ? `(${joinLink.split('\n').filter(l => l.trim() && l.trim().startsWith('http')).length} nhóm)` : ''}
             </Button>
           </div>
         </div>
@@ -960,8 +1042,12 @@ Tham gia: ${formatRelativeTime(group.joinedAt)}`
           setSelectedGroup(null)
           setAddUserInput('')
         }}
-        title="Thêm thành viên vào nhóm"
-        description={selectedGroup ? `Thêm thành viên mới vào nhóm "${selectedGroup.name}"` : undefined}
+        title={selectedGroup?.isAdmin ? "Thêm thành viên vào nhóm" : "Mời bạn bè vào nhóm"}
+        description={selectedGroup ? (
+          selectedGroup.isAdmin 
+            ? `Thêm thành viên mới vào nhóm "${selectedGroup.name}" (Quyền Admin)`
+            : `Mời bạn bè vào nhóm "${selectedGroup.name}" (Chỉ mời được bạn bè)`
+        ) : undefined}
         size="lg"
       >
         <div className="space-y-6">

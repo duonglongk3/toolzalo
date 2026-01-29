@@ -361,7 +361,7 @@ ipcMain.handle('db-get-account', (_event, id: string) => {
 })
 
 ipcMain.handle('db-create-account', (_event, account: any) => {
-  return db?.createAccount(account)
+  return db?.upsertAccount(account)
 })
 
 ipcMain.handle('db-update-account', (_event, id: string, updates: any) => {
@@ -483,6 +483,17 @@ ipcMain.handle('db-create-share-category', (_event, category: any) => {
 
 ipcMain.handle('db-delete-share-category', (_event, id: string) => {
   return db?.deleteShareCategory(id)
+})
+// Sync State
+ipcMain.handle('db-get-sync-state', () => {
+  return db?.getSyncState()
+})
+ipcMain.handle('db-update-sync-state', (_event, updates: any) => {
+  return db?.updateSyncState(updates)
+})
+ipcMain.handle('db-reset-sync-state', () => {
+  db?.resetSyncState()
+  return true
 })
 // Zalo API handlers using zca-js in main process
 let Zalo: any = null
@@ -851,6 +862,22 @@ ipcMain.handle('zalo-get-account-info', async () => {
   }
 })
 
+// Get group link detail (invite link)
+ipcMain.handle('zalo-get-group-link-detail', async (_event, groupId: string) => {
+  try {
+    if (!zaloAPI) return { success: false, error: 'Not logged in' }
+    if (!groupId) return { success: false, error: 'Missing groupId' }
+    if (typeof (zaloAPI as any).getGroupLinkDetail !== 'function') {
+      return { success: false, error: 'getGroupLinkDetail not available' }
+    }
+    const info = await (zaloAPI as any).getGroupLinkDetail(groupId)
+    return { success: true, info }
+  } catch (error) {
+    console.error('Get group link detail error:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
 // Get user info (supports single or batch ids)
 ipcMain.handle('zalo-get-user-info', async (_event, userOrIds: string | string[]) => {
   try {
@@ -877,14 +904,27 @@ ipcMain.handle('zalo-join-group-link', async (_event, link: string) => {
     if (typeof (zaloAPI as any).joinGroupLink !== 'function') {
       return { success: false, error: 'joinGroupLink not available' }
     }
-    const info = await (zaloAPI as any).joinGroupLink(link)
+    // Normalize link: extract clean link if user pastes full URL with extra params
+    let cleanLink = link.trim()
+    // Support both formats: full URL or just the path
+    // e.g., https://zalo.me/g/abc123 or zalo.me/g/abc123 or just /g/abc123
+    const match = cleanLink.match(/(?:https?:\/\/)?(?:zalo\.me)?(\/g\/[a-zA-Z0-9_-]+)/i)
+    if (match) {
+      cleanLink = `https://zalo.me${match[1]}`
+    }
+    console.log('Joining group with link:', cleanLink)
+    const info = await (zaloAPI as any).joinGroupLink(cleanLink)
     return { success: true, info }
   } catch (error: any) {
     console.error('Join group via link error:', error)
     const msg = error?.message || String(error)
-    // try extract error code if present in message
-    const codeMatch = String(msg).match(/code\s*[:=]\s*(\d+)/i)
-    return { success: false, error: msg, code: codeMatch ? Number(codeMatch[1]) : undefined }
+    // ZaloApiError has .code property, also try regex extraction as fallback
+    let code = error?.code
+    if (!code) {
+      const codeMatch = String(msg).match(/code\s*[:=]?\s*(\d+)/i)
+      code = codeMatch ? Number(codeMatch[1]) : undefined
+    }
+    return { success: false, error: msg, code }
   }
 })
 
@@ -902,7 +942,8 @@ ipcMain.handle('zalo-find-user', async (_event, phoneNumber: string) => {
   }
 })
 
-// Send friend request by userId (robust to API signature differences)
+// Send friend request by userId
+// zca-js signature: sendFriendRequest(msg: string, userId: string)
 ipcMain.handle('zalo-send-friend-request', async (_event, payload: { userId: string; message?: string }) => {
   try {
     if (!zaloAPI) return { success: false, error: 'Not logged in' }
@@ -912,44 +953,25 @@ ipcMain.handle('zalo-send-friend-request', async (_event, payload: { userId: str
     if (!uid) return { success: false, error: 'Missing userId' }
 
     const api: any = zaloAPI as any
-    const tryCalls: Array<() => Promise<any>> = []
-
-    // Primary expected signature (from zca-js): (msg, userId)
-    if (typeof api.sendFriendRequest === 'function') {
-      tryCalls.push(() => api.sendFriendRequest(msg, uid))
-      // Some builds may accept an options object as first param
-      tryCalls.push(() => api.sendFriendRequest({ msg }, uid))
-      // Fallback: reversed parameters or optional message
-      tryCalls.push(() => api.sendFriendRequest(uid, msg))
-      tryCalls.push(() => api.sendFriendRequest(uid))
+    if (typeof api.sendFriendRequest !== 'function') {
+      return { success: false, error: 'sendFriendRequest not available' }
     }
 
-    // Possible older alias
-    if (api.friend?.sendRequest) {
-      tryCalls.push(() => api.friend.sendRequest(uid, msg))
-      tryCalls.push(() => api.friend.sendRequest({ toid: uid, msg }))
-    }
-
-    if (tryCalls.length === 0) return { success: false, error: 'sendFriendRequest not available' }
-
-    let lastErr: any = null
-    for (const call of tryCalls) {
-      try {
-        const res = await call()
-        return { success: true, info: res }
-      } catch (e: any) {
-        lastErr = e
-      }
-    }
-
-    const msgErr = lastErr?.message || String(lastErr)
-    const code = (lastErr && typeof lastErr === 'object' && 'code' in lastErr) ? Number((lastErr as any).code) : (String(msgErr).match(/code\s*[:=]\s*(\d+)/i)?.[1] ? Number(String(msgErr).match(/code\s*[:=]\s*(\d+)/i)![1]) : undefined)
-    return { success: false, error: msgErr, code }
+    console.log('📤 Sending friend request:', { userId: uid, messageLength: msg.length })
+    
+    // zca-js signature: sendFriendRequest(msg, userId)
+    const res = await api.sendFriendRequest(msg, uid)
+    console.log('✅ Friend request sent successfully:', res)
+    return { success: true, info: res }
   } catch (error: any) {
     console.error('Send friend request error:', error)
-    const msg = error?.message || String(error)
-    const code = (error && typeof error === 'object' && 'code' in error) ? Number(error.code) : (String(msg).match(/code\s*[:=]\s*(\d+)/i)?.[1] ? Number(String(msg).match(/code\s*[:=]\s*(\d+)/i)![1]) : undefined)
-    return { success: false, error: msg, code }
+    const errMsg = error?.message || String(error)
+    const code = (error && typeof error === 'object' && 'code' in error) 
+      ? Number(error.code) 
+      : (String(errMsg).match(/code\s*[:=]\s*(\d+)/i)?.[1] 
+        ? Number(String(errMsg).match(/code\s*[:=]\s*(\d+)/i)![1]) 
+        : undefined)
+    return { success: false, error: errMsg, code }
   }
 })
 
@@ -990,10 +1012,14 @@ ipcMain.handle('zalo-add-user-to-group', async (_event, payload: { groupId: stri
           error_data: result?.error_data
         })
 
-        // Check for error code 188 (not friends) or 269 (stranger in invite list)
+        // Check for error codes related to "not friends" / "stranger":
+        // 188 = not friends
+        // 263 = stranger in invite list (danh sách mời có người lạ)
+        // 269 = stranger in invite list
         const error188Users: string[] = result?.error_data?.['188'] || []
+        const error263Users: string[] = result?.error_data?.['263'] || []
         const error269Users: string[] = result?.error_data?.['269'] || []
-        const notFriendUsers = [...error188Users, ...error269Users]
+        const notFriendUsers = [...new Set([...error188Users, ...error263Users, ...error269Users])]
 
         // If some users succeeded
         if (!result?.errorMembers || result.errorMembers.length < cleanUserIds.length) {
@@ -1005,15 +1031,15 @@ ipcMain.handle('zalo-add-user-to-group', async (_event, payload: { groupId: stri
           }
         }
 
-        // If all failed due to "not friends", return specific error
-        if (notFriendUsers.length === cleanUserIds.length) {
-          console.log('⚠️ All users failed because they are not friends')
+        // If all failed due to "not friends" / "stranger", return specific error (don't try fallback)
+        if (notFriendUsers.length > 0 && notFriendUsers.length === cleanUserIds.length) {
+          console.log('⚠️ All users failed because they are not friends (error codes: 188/263/269)')
           return {
             success: false,
             errorMembers: result?.errorMembers || [],
             error_data: result?.error_data || {},
             notFriendUsers,
-            error: 'Cần kết bạn trước khi thêm vào nhóm'
+            error: 'Người dùng chưa phải bạn bè. Cần gửi lời mời kết bạn trước khi thêm vào nhóm.'
           }
         }
 

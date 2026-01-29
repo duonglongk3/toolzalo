@@ -81,6 +81,10 @@ const electronAPI = {
     getShareCategories: () => ipcRenderer.invoke('db-get-share-categories'),
     createShareCategory: (category: any) => ipcRenderer.invoke('db-create-share-category', category),
     deleteShareCategory: (id: string) => ipcRenderer.invoke('db-delete-share-category', id),
+    // Sync State
+    getSyncState: () => ipcRenderer.invoke('db-get-sync-state'),
+    updateSyncState: (updates: any) => ipcRenderer.invoke('db-update-sync-state', updates),
+    resetSyncState: () => ipcRenderer.invoke('db-reset-sync-state'),
   },
   // Zalo API operations
   zalo: {
@@ -97,6 +101,7 @@ const electronAPI = {
     getFriends: () => ipcRenderer.invoke('zalo-get-friends'),
     getGroups: () => ipcRenderer.invoke('zalo-get-groups'),
     getGroupInfo: (groupId: string | string[]) => ipcRenderer.invoke('zalo-get-group-info', groupId),
+    getGroupLinkDetail: (groupId: string) => ipcRenderer.invoke('zalo-get-group-link-detail', groupId),
     joinGroupLink: (link: string) => ipcRenderer.invoke('zalo-join-group-link', link),
     findUser: (phoneNumber: string) => ipcRenderer.invoke('zalo-find-user', phoneNumber),
     sendFriendRequest: (userId: string, message?: string) => ipcRenderer.invoke('zalo-send-friend-request', { userId, message }),

@@ -12,12 +12,14 @@ import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui
 import { useFriendsStore, useGroupsStore, useAppStore } from '@/store'
 import { useAccountStore } from '@/store/database-store'
 import { formatNumber, formatRelativeTime } from '@/utils'
+import { useI18n } from '@/i18n'
 
 const Dashboard: React.FC = () => {
   const { accounts, activeAccount } = useAccountStore()
   const { friends } = useFriendsStore()
   const { groups } = useGroupsStore()
   const { tasks } = useAppStore()
+  const { t } = useI18n()
 
   // Calculate statistics
   const stats = {
@@ -60,9 +62,9 @@ const Dashboard: React.FC = () => {
     <div className="p-6 space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-secondary-900">Tổng quan</h1>
+        <h1 className="text-2xl font-bold text-secondary-900">{t('dashboard.title')}</h1>
         <p className="text-secondary-600 mt-1">
-          Quản lý và theo dõi hoạt động Zalo của bạn
+          {t('dashboard.subtitle')}
         </p>
       </div>
 
@@ -72,12 +74,12 @@ const Dashboard: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-secondary-600">Tài khoản</p>
+                <p className="text-sm font-medium text-secondary-600">{t('nav.accounts')}</p>
                 <p className="text-2xl font-bold text-secondary-900">
                   {formatNumber(stats.totalAccounts)}
                 </p>
                 <p className="text-xs text-success-600 mt-1">
-                  {stats.activeAccounts} đang hoạt động
+                  {stats.activeAccounts} {t('accounts.active')}
                 </p>
               </div>
               <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -91,12 +93,12 @@ const Dashboard: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-secondary-600">Bạn bè</p>
+                <p className="text-sm font-medium text-secondary-600">{t('nav.friends')}</p>
                 <p className="text-2xl font-bold text-secondary-900">
                   {formatNumber(stats.totalFriends)}
                 </p>
                 <p className="text-xs text-secondary-500 mt-1">
-                  Tổng số bạn bè
+                  {t('friends.totalFriends')}
                 </p>
               </div>
               <div className="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center">
@@ -110,12 +112,12 @@ const Dashboard: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-secondary-600">Nhóm</p>
+                <p className="text-sm font-medium text-secondary-600">{t('nav.groups')}</p>
                 <p className="text-2xl font-bold text-secondary-900">
                   {formatNumber(stats.totalGroups)}
                 </p>
                 <p className="text-xs text-secondary-500 mt-1">
-                  Đã tham gia
+                  {t('groups.totalGroups')}
                 </p>
               </div>
               <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
@@ -129,12 +131,12 @@ const Dashboard: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-secondary-600">Tác vụ</p>
+                <p className="text-sm font-medium text-secondary-600">{t('dashboard.activeTasks')}</p>
                 <p className="text-2xl font-bold text-secondary-900">
                   {formatNumber(stats.activeTasks)}
                 </p>
                 <p className="text-xs text-success-600 mt-1">
-                  {stats.completedTasks} hoàn thành
+                  {stats.completedTasks} {t('common.completed')}
                 </p>
               </div>
               <div className="w-12 h-12 bg-info-100 rounded-lg flex items-center justify-center">
@@ -151,7 +153,7 @@ const Dashboard: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Zap className="w-5 h-5" />
-              <span>Tài khoản hiện tại</span>
+              <span>{t('nav.accounts')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -180,26 +182,26 @@ const Dashboard: React.FC = () => {
                       'error'
                     }
                   >
-                    {activeAccount.status === 'online' ? 'Trực tuyến' :
-                     activeAccount.status === 'offline' ? 'Ngoại tuyến' :
-                     'Lỗi'}
+                    {activeAccount.status === 'online' ? t('accounts.loggedIn') :
+                     activeAccount.status === 'offline' ? t('accounts.notLoggedIn') :
+                     t('common.error')}
                   </Badge>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-secondary-200">
                   <div>
-                    <p className="text-xs text-secondary-500">Đăng nhập lần cuối</p>
+                    <p className="text-xs text-secondary-500">{t('common.status')}</p>
                     <p className="text-sm font-medium text-secondary-900">
                       {activeAccount.lastLogin 
                         ? formatRelativeTime(activeAccount.lastLogin)
-                        : 'Chưa xác định'
+                        : t('common.noData')
                       }
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-secondary-500">Trạng thái</p>
+                    <p className="text-xs text-secondary-500">{t('common.status')}</p>
                     <p className="text-sm font-medium text-secondary-900">
-                      Hoạt động bình thường
+                      {t('accounts.active')}
                     </p>
                   </div>
                 </div>
@@ -207,9 +209,9 @@ const Dashboard: React.FC = () => {
             ) : (
               <div className="text-center py-8">
                 <Zap className="w-12 h-12 text-secondary-400 mx-auto mb-3" />
-                <p className="text-secondary-600">Chưa có tài khoản nào được chọn</p>
+                <p className="text-secondary-600">{t('accounts.noAccounts')}</p>
                 <p className="text-sm text-secondary-500 mt-1">
-                  Vui lòng thêm và chọn tài khoản để bắt đầu
+                  {t('errors.accountRequired')}
                 </p>
               </div>
             )}
@@ -221,7 +223,7 @@ const Dashboard: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Clock className="w-5 h-5" />
-              <span>Hoạt động gần đây</span>
+              <span>{t('dashboard.recentActivity')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -250,7 +252,7 @@ const Dashboard: React.FC = () => {
               {recentActivity.length === 0 && (
                 <div className="text-center py-8">
                   <Activity className="w-12 h-12 text-secondary-400 mx-auto mb-3" />
-                  <p className="text-secondary-600">Chưa có hoạt động nào</p>
+                  <p className="text-secondary-600">{t('common.noData')}</p>
                 </div>
               )}
             </div>
@@ -263,7 +265,7 @@ const Dashboard: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <TrendingUp className="w-5 h-5" />
-            <span>Thao tác nhanh</span>
+            <span>{t('dashboard.quickActions')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -274,8 +276,8 @@ const Dashboard: React.FC = () => {
                   <MessageSquare className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-secondary-900">Gửi tin nhắn</p>
-                  <p className="text-sm text-secondary-600">Gửi tin nhắn hàng loạt</p>
+                  <p className="font-medium text-secondary-900">{t('dashboard.sendMessages')}</p>
+                  <p className="text-sm text-secondary-600">{t('messages.sendToAll')}</p>
                 </div>
               </div>
             </div>
@@ -286,8 +288,8 @@ const Dashboard: React.FC = () => {
                   <Users className="w-5 h-5 text-success-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-secondary-900">Thêm bạn bè</p>
-                  <p className="text-sm text-secondary-600">Thêm bạn hàng loạt</p>
+                  <p className="font-medium text-secondary-900">{t('dashboard.syncFriends')}</p>
+                  <p className="text-sm text-secondary-600">{t('friends.syncFriends')}</p>
                 </div>
               </div>
             </div>
@@ -298,8 +300,8 @@ const Dashboard: React.FC = () => {
                   <Users2 className="w-5 h-5 text-warning-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-secondary-900">Quét nhóm</p>
-                  <p className="text-sm text-secondary-600">Lấy danh sách thành viên</p>
+                  <p className="font-medium text-secondary-900">{t('dashboard.syncGroups')}</p>
+                  <p className="text-sm text-secondary-600">{t('groups.syncGroups')}</p>
                 </div>
               </div>
             </div>

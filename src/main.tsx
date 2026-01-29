@@ -2,6 +2,32 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import { useSyncStore } from './store'
+
+// Auto-detect system dark mode preference
+function initDarkMode() {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  if (isDark) {
+    document.documentElement.classList.add('dark')
+  } else {
+    document.documentElement.classList.remove('dark')
+  }
+}
+
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (e.matches) {
+    document.documentElement.classList.add('dark')
+  } else {
+    document.documentElement.classList.remove('dark')
+  }
+})
+
+// Initialize dark mode on load
+initDarkMode()
+
+// Initialize sync state from database
+useSyncStore.getState().initFromDb()
 
 // Error boundary component
 class ErrorBoundary extends React.Component<

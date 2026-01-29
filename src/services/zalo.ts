@@ -116,7 +116,7 @@ class ZaloService {
     }
   }
 
-  async addFriend(phoneNumber: string): Promise<boolean> {
+  async addFriend(phoneNumber: string, message: string = ''): Promise<boolean> {
     try {
       if (!this.electronAPI?.zalo) throw new Error('Electron Zalo API not available')
       const phone = (phoneNumber || '').trim()
@@ -129,8 +129,24 @@ class ZaloService {
         console.warn('findUser did not return uid for phone:', phone)
         return false
       }
-      // API signature: sendFriendRequest(message, userId)
-      const res = await this.electronAPI.zalo.sendFriendRequest('', uid)
+      
+      // Lấy tên người dùng từ kết quả findUser
+      const displayName = data?.display_name || data?.displayName || data?.zalo_name || data?.zaloName || ''
+      const zaloName = data?.zalo_name || data?.zaloName || displayName || ''
+      
+      // Thay thế các placeholder trong message
+      let finalMessage = message || ''
+      if (finalMessage) {
+        finalMessage = finalMessage
+          .replace(/\{name\}/gi, displayName || zaloName || uid)
+          .replace(/\{displayName\}/gi, displayName || uid)
+          .replace(/\{zaloName\}/gi, zaloName || uid)
+          .replace(/\{userId\}/gi, uid)
+          .replace(/\{phone\}/gi, phone)
+      }
+      
+      // API signature: sendFriendRequest(userId, message)
+      const res = await this.electronAPI.zalo.sendFriendRequest(uid, finalMessage)
       return !!res?.success
     } catch (error) {
       console.error('Add friend error:', error)
@@ -152,11 +168,25 @@ class ZaloService {
     }
   }
 
-  async sendFriendRequest(message: string, userId: string): Promise<{ success: boolean; code?: number; error?: string }> {
+  async sendFriendRequest(message: string, userId: string, userInfo?: { displayName?: string; zaloName?: string; phone?: string }): Promise<{ success: boolean; code?: number; error?: string }> {
     try {
       if (!this.electronAPI?.zalo) throw new Error('Electron Zalo API not available')
-      // Electron API expects (message, userId) to match zca-js signature
-      const res = await this.electronAPI.zalo.sendFriendRequest(message, userId)
+      
+      // Thay thế các placeholder trong message nếu có
+      let finalMessage = message || ''
+      if (finalMessage && userInfo) {
+        const displayName = userInfo.displayName || userInfo.zaloName || ''
+        const zaloName = userInfo.zaloName || userInfo.displayName || ''
+        finalMessage = finalMessage
+          .replace(/\{name\}/gi, displayName || zaloName || userId)
+          .replace(/\{displayName\}/gi, displayName || userId)
+          .replace(/\{zaloName\}/gi, zaloName || userId)
+          .replace(/\{userId\}/gi, userId)
+          .replace(/\{phone\}/gi, userInfo.phone || '')
+      }
+      
+      // Electron API expects (userId, message) - userId first, message second
+      const res = await this.electronAPI.zalo.sendFriendRequest(userId, finalMessage)
       if (res?.success) return { success: true }
       return { success: false, code: res?.code, error: res?.error }
     } catch (error: any) {
@@ -174,17 +204,30 @@ class ZaloService {
     onProgress?: (p: { phase: 'resolve' | 'send'; index: number; total: number; sent: number; already: number; failed: number; resolved: number; target?: string; code?: number; status?: 'sent'|'already'|'failed' }) => void
   ): Promise<{ sent: number; already: number; failed: number; resolved: number; details: Array<{ target: string; status: 'sent'|'already'|'failed'; code?: number; error?: string }> }> {
     const details: Array<{ target: string; status: 'sent'|'already'|'failed'; code?: number; error?: string }> = []
+    // Map userId -> userInfo để lưu thông tin tên
+    const userInfoMap: Map<string, { displayName?: string; zaloName?: string; phone?: string }> = new Map()
+    
     // Chuẩn hóa userId: chỉ để số, loại bỏ ký tự không hợp lệ
     const ids = new Set<string>((userIds || []).map(u => String(u || '').replace(/[^\d]/g, '').trim()).filter(Boolean))
 
-    // Resolve phones -> userIds
+    // Resolve phones -> userIds và lưu thông tin tên
     let resolved = 0
     const totalResolve = (phones || []).filter(p => (p||'').trim()).length
     let resolveIndex = 0
     for (const raw of (phones || [])) {
       const phone = (raw || '').trim(); if (!phone) continue
-      const { userId } = await this.findUser(phone)
-      if (userId) { ids.add(userId); resolved++ } else { details.push({ target: phone, status: 'failed', error: 'not_found' }) }
+      const { userId, raw: rawInfo } = await this.findUser(phone)
+      if (userId) {
+        ids.add(userId)
+        resolved++
+        // Lưu thông tin tên để dùng cho placeholder replacement
+        const data = rawInfo?.data || rawInfo
+        const displayName = data?.display_name || data?.displayName || data?.zalo_name || data?.zaloName || ''
+        const zaloName = data?.zalo_name || data?.zaloName || displayName || ''
+        userInfoMap.set(userId, { displayName, zaloName, phone })
+      } else {
+        details.push({ target: phone, status: 'failed', error: 'not_found' })
+      }
       resolveIndex++
       onProgress?.({ phase: 'resolve', index: resolveIndex, total: totalResolve, sent: 0, already: 0, failed: 0, resolved, target: phone })
       if (delayMs > 0) await new Promise(r => setTimeout(r, Math.max(0, Math.min(600000, delayMs))))
@@ -195,7 +238,9 @@ class ZaloService {
     const totalSend = idList.length
     let sendIndex = 0
     for (const uid of idList) {
-      const r = await this.sendFriendRequest(message, uid)
+      // Truyền userInfo để thay thế placeholder trong message
+      const userInfo = userInfoMap.get(uid)
+      const r = await this.sendFriendRequest(message, uid, userInfo)
       if (r.success) { details.push({ target: uid, status: 'sent' }); sent++ }
       else if (r.code === 225 || r.code === 222) { details.push({ target: uid, status: 'already', code: r.code }); already++ }
       else { details.push({ target: uid, status: 'failed', code: r.code, error: r.error }); failed++ }

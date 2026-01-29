@@ -118,16 +118,37 @@ const Accounts: React.FC = () => {
   }
 
   const handleSetActive = async (account: ZaloAccount) => {
-    setActiveAccount(account)
-    // Simulate login process
+    const loadingId = toast.loading(`Đang chuyển sang tài khoản "${account.name}"...`)
+    
     try {
-      await updateAccount(account.id, {
-        status: 'online',
-        lastLogin: new Date()
+      // Logout tài khoản cũ trước (nếu đang login)
+      if (zaloService.isLoggedIn()) {
+        await zaloService.logout()
+      }
+      
+      // Login với tài khoản mới
+      const success = await zaloService.login({
+        imei: account.imei,
+        cookie: account.cookie,
+        userAgent: account.userAgent
       })
-      toast.success(`Đã chuyển sang tài khoản "${account.name}"`)
+      
+      if (success) {
+        // Chỉ set active sau khi login thành công
+        setActiveAccount(account)
+        await updateAccount(account.id, {
+          status: 'online',
+          lastLogin: new Date()
+        })
+        toast.success(`Đã chuyển sang tài khoản "${account.name}"`, { id: loadingId })
+      } else {
+        // Login thất bại
+        await updateAccount(account.id, { status: 'error' })
+        toast.error(`Không thể đăng nhập tài khoản "${account.name}". Vui lòng kiểm tra thông tin.`, { id: loadingId })
+      }
     } catch (error) {
       console.error('Set active account error:', error)
+      toast.error(`Lỗi khi chuyển tài khoản: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: loadingId })
     }
   }
 

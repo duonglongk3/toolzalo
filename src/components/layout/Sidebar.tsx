@@ -12,6 +12,7 @@ import {
 import { cn } from '@/utils'
 import { useAccountStore } from '@/store/database-store'
 import { Badge } from '@/components/ui'
+import { useI18n } from '@/i18n'
 
 interface SidebarProps {
   collapsed?: boolean
@@ -19,42 +20,43 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
   const { activeAccount } = useAccountStore()
+  const { t } = useI18n()
 
   const navigationItems = [
     {
-      title: 'Tổng quan',
+      title: t('nav.dashboard'),
       href: '/',
       icon: Home,
       exact: true
     },
     {
-      title: 'Tài khoản Zalo',
+      title: t('nav.accounts'),
       href: '/accounts',
       icon: Zap,
       badge: activeAccount ? 'active' : undefined
     },
     {
-      title: 'Quản lý bạn bè',
+      title: t('nav.friends'),
       href: '/friends',
       icon: Users
     },
     {
-      title: 'Nhắn tin cá nhân',
+      title: t('nav.personalMessages'),
       href: '/personal-messages',
       icon: MessageSquare
     },
     {
-      title: 'Quản lý nhóm',
+      title: t('nav.groups'),
       href: '/groups',
       icon: Users2
     },
     {
-      title: 'Nhắn tin nhóm',
+      title: t('nav.groupMessages'),
       href: '/group-messages',
       icon: MessageCircle
     },
     {
-      title: 'Cài đặt',
+      title: t('nav.settings'),
       href: '/settings',
       icon: Settings
     }

@@ -2,6 +2,7 @@ import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout'
 import { LicenseProvider } from '@/contexts/LicenseContext'
+import { I18nProvider } from '@/i18n'
 import LicenseGuard from '@/components/LicenseGuard'
 import UpdateNotification from '@/components/UpdateNotification'
 
@@ -53,8 +54,9 @@ const PlaceholderPage: React.FC<{ title: string; description: string }> = ({ tit
 
 const App: React.FC = () => {
   return (
-    <LicenseProvider>
-      <Router>
+    <I18nProvider>
+      <LicenseProvider>
+        <Router>
         <div className="App">
           <Routes>
             {/* License activation page - accessible without license */}
@@ -83,8 +85,9 @@ const App: React.FC = () => {
           {/* Update notification popup */}
           <UpdateNotification />
         </div>
-      </Router>
-    </LicenseProvider>
+        </Router>
+      </LicenseProvider>
+    </I18nProvider>
   )
 }
 

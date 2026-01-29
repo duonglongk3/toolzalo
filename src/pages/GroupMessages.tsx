@@ -2,7 +2,8 @@ import React from 'react'
 import { Send, Calendar, Users, FileText, Play, RotateCcw } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Modal, Input } from '@/components/ui'
 import TemplateSelector from '@/components/TemplateSelector'
-import { useTemplateStore, useGroupsStore, useAccountStore } from '@/store'
+import { useTemplateStore, useGroupsStore } from '@/store'
+import { useAccountStore } from '@/store/database-store'
 import { formatRelativeTime } from '@/utils'
 import { zaloService } from '@/services'
 import type { MessageTemplate, MediaAttachment } from '@/types'
@@ -118,6 +119,9 @@ const GroupMessages: React.FC = () => {
   }
 
   const handleSendMessages = async () => {
+    // Debug: kiểm tra activeAccount
+    console.log('🔥 handleSendMessages - activeAccount:', activeAccount)
+    
     if (!selectedTemplate) {
       toast.error('Vui lòng chọn template')
       return
@@ -128,7 +132,11 @@ const GroupMessages: React.FC = () => {
       return
     }
 
-    if (!activeAccount) {
+    // Lấy lại activeAccount từ store để đảm bảo có giá trị mới nhất
+    const currentActiveAccount = useAccountStore.getState().activeAccount
+    console.log('🔥 handleSendMessages - currentActiveAccount from getState:', currentActiveAccount)
+    
+    if (!currentActiveAccount) {
       toast.error('Vui lòng chọn tài khoản')
       return
     }
@@ -138,9 +146,9 @@ const GroupMessages: React.FC = () => {
     if (!zaloService.isLoggedIn()) {
       toast.loading('Đang đăng nhập...', { id: 'auto-login' })
       const ok = await zaloService.login({
-        imei: activeAccount.imei,
-        cookie: activeAccount.cookie,
-        userAgent: activeAccount.userAgent,
+        imei: currentActiveAccount.imei,
+        cookie: currentActiveAccount.cookie,
+        userAgent: currentActiveAccount.userAgent,
       } as any)
       toast.dismiss('auto-login')
       if (!ok) {

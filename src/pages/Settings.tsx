@@ -3,11 +3,13 @@ import { Settings as SettingsIcon, Moon, Sun, Monitor, Globe, Bell, Shield, Data
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Modal, Input } from '@/components/ui'
 import { useAppStore } from '@/store'
 import { useLicense } from '@/contexts/LicenseContext'
+import { useI18n } from '@/i18n'
 import toast from 'react-hot-toast'
 
 const Settings: React.FC = () => {
   const { config, updateConfig } = useAppStore()
   const { isLicenseValid, licenseInfo, clearLicense, hwid } = useLicense()
+  const { t } = useI18n()
   const [showBackupModal, setShowBackupModal] = React.useState(false)
   const [showRestoreModal, setShowRestoreModal] = React.useState(false)
   const [backupData, setBackupData] = React.useState('')
@@ -28,12 +30,12 @@ const Settings: React.FC = () => {
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
     updateConfig({ theme })
-    toast.success('Đã cập nhật giao diện')
+    toast.success(t('settings.themeUpdated'))
   }
 
   const handleLanguageChange = (language: 'vi' | 'en') => {
     updateConfig({ language })
-    toast.success('Đã cập nhật ngôn ngữ')
+    toast.success(t('settings.languageUpdated'))
   }
 
   const handleExportData = () => {
@@ -60,16 +62,16 @@ const Settings: React.FC = () => {
       link.click()
       document.body.removeChild(link)
 
-      toast.success('Đã xuất dữ liệu thành công')
+      toast.success(t('settings.exportSuccess'))
     } catch (error) {
       console.error('Export data error:', error)
-      toast.error('Lỗi khi xuất dữ liệu')
+      toast.error(t('settings.exportFailed'))
     }
   }
 
   const handleImportData = () => {
     if (!backupData.trim()) {
-      toast.error('Vui lòng dán dữ liệu backup')
+      toast.error(t('settings.pasteBackupData'))
       return
     }
 
@@ -88,7 +90,7 @@ const Settings: React.FC = () => {
       if (data.templates) localStorage.setItem('zalo-templates', JSON.stringify(data.templates))
       if (data.config) localStorage.setItem('zalo-app', JSON.stringify(data.config))
 
-      toast.success('Đã khôi phục dữ liệu thành công. Vui lòng tải lại ứng dụng.')
+      toast.success(t('settings.importSuccess'))
       setBackupData('')
       setShowRestoreModal(false)
 
@@ -98,14 +100,14 @@ const Settings: React.FC = () => {
       }, 2000)
     } catch (error) {
       console.error('Import data error:', error)
-      toast.error('Dữ liệu backup không hợp lệ')
+      toast.error(t('settings.importFailed'))
     }
   }
 
   const handleClearData = () => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa tất cả dữ liệu? Hành động này không thể hoàn tác.')) {
+    if (window.confirm(t('settings.clearDataConfirm'))) {
       localStorage.clear()
-      toast.success('Đã xóa tất cả dữ liệu. Ứng dụng sẽ tải lại.')
+      toast.success(t('settings.clearDataSuccess'))
       setTimeout(() => {
         window.location.reload()
       }, 1000)
@@ -117,9 +119,9 @@ const Settings: React.FC = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Cài đặt</h1>
+          <h1 className="text-2xl font-bold text-secondary-900">{t('settings.title')}</h1>
           <p className="text-secondary-600 mt-1">
-            Tùy chỉnh ứng dụng và quản lý dữ liệu
+            {t('settings.subtitle')}
           </p>
         </div>
       </div>
@@ -129,7 +131,7 @@ const Settings: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Key className="w-5 h-5" />
-            <span>Thông tin License</span>
+            <span>{t('settings.license')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -137,26 +139,26 @@ const Settings: React.FC = () => {
             <>
               <div className="flex items-center space-x-2 text-green-600">
                 <CheckCircle className="w-5 h-5" />
-                <span className="font-medium">License đã kích hoạt</span>
+                <span className="font-medium">{t('settings.licenseActivated')}</span>
               </div>
               
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-secondary-500">Sản phẩm:</span>
+                  <span className="text-secondary-500">{t('settings.product')}:</span>
                   <p className="font-medium">{licenseInfo.product}</p>
                 </div>
                 <div>
-                  <span className="text-secondary-500">Loại:</span>
+                  <span className="text-secondary-500">{t('settings.type')}:</span>
                   <p className="font-medium capitalize">{licenseInfo.type}</p>
                 </div>
                 <div>
-                  <span className="text-secondary-500">Hết hạn:</span>
+                  <span className="text-secondary-500">{t('settings.expiryDate')}:</span>
                   <p className="font-medium">
-                    {licenseInfo.isLifetime ? 'Vĩnh viễn' : new Date(licenseInfo.expiryDate).toLocaleDateString('vi-VN')}
+                    {licenseInfo.isLifetime ? t('settings.lifetime') : new Date(licenseInfo.expiryDate).toLocaleDateString(config.language === 'vi' ? 'vi-VN' : 'en-US')}
                   </p>
                 </div>
                 <div>
-                  <span className="text-secondary-500">Thiết bị:</span>
+                  <span className="text-secondary-500">{t('settings.devices')}:</span>
                   <p className="font-medium">{licenseInfo.activeDevices}/{licenseInfo.maxDevices}</p>
                 </div>
               </div>
@@ -164,7 +166,7 @@ const Settings: React.FC = () => {
               {!licenseInfo.isLifetime && licenseInfo.daysRemaining <= 7 && (
                 <div className="flex items-center p-3 bg-yellow-50 rounded-lg text-yellow-700">
                   <AlertTriangle className="w-5 h-5 mr-2" />
-                  <span className="text-sm">License sẽ hết hạn trong {licenseInfo.daysRemaining} ngày</span>
+                  <span className="text-sm">{t('settings.licenseExpiringSoon', { days: licenseInfo.daysRemaining })}</span>
                 </div>
               )}
 
@@ -176,22 +178,22 @@ const Settings: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    if (window.confirm('Bạn có chắc muốn hủy kích hoạt license này?')) {
+                    if (window.confirm(t('settings.deactivateConfirm'))) {
                       clearLicense()
-                      toast.success('Đã hủy kích hoạt license')
+                      toast.success(t('settings.deactivateSuccess'))
                       window.location.reload()
                     }
                   }}
                   className="text-red-600"
                 >
-                  Hủy kích hoạt
+                  {t('settings.deactivate')}
                 </Button>
               </div>
             </>
           ) : (
             <div className="text-center py-4">
               <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-2" />
-              <p className="text-secondary-600">Chưa kích hoạt license</p>
+              <p className="text-secondary-600">{t('settings.licenseNotActivated')}</p>
             </div>
           )}
         </CardContent>
@@ -202,13 +204,13 @@ const Settings: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Monitor className="w-5 h-5" />
-            <span>Giao diện</span>
+            <span>{t('settings.appearance')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-3">
-              Chủ đề
+              {t('settings.theme')}
             </label>
             <div className="flex space-x-2">
               <Button
@@ -217,7 +219,7 @@ const Settings: React.FC = () => {
                 onClick={() => handleThemeChange('light')}
                 icon={<Sun className="w-4 h-4" />}
               >
-                Sáng
+                {t('settings.themeLight')}
               </Button>
               <Button
                 variant={config.theme === 'dark' ? 'default' : 'outline'}
@@ -225,7 +227,7 @@ const Settings: React.FC = () => {
                 onClick={() => handleThemeChange('dark')}
                 icon={<Moon className="w-4 h-4" />}
               >
-                Tối
+                {t('settings.themeDark')}
               </Button>
               <Button
                 variant={config.theme === 'system' ? 'default' : 'outline'}
@@ -233,14 +235,14 @@ const Settings: React.FC = () => {
                 onClick={() => handleThemeChange('system')}
                 icon={<Monitor className="w-4 h-4" />}
               >
-                Hệ thống
+                {t('settings.themeSystem')}
               </Button>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-3">
-              Ngôn ngữ
+              {t('settings.language')}
             </label>
             <div className="flex space-x-2">
               <Button
@@ -249,7 +251,7 @@ const Settings: React.FC = () => {
                 onClick={() => handleLanguageChange('vi')}
                 icon={<Globe className="w-4 h-4" />}
               >
-                Tiếng Việt
+                {t('settings.languageVi')}
               </Button>
               <Button
                 variant={config.language === 'en' ? 'default' : 'outline'}
@@ -257,7 +259,7 @@ const Settings: React.FC = () => {
                 onClick={() => handleLanguageChange('en')}
                 icon={<Globe className="w-4 h-4" />}
               >
-                English
+                {t('settings.languageEn')}
               </Button>
             </div>
           </div>
@@ -269,14 +271,14 @@ const Settings: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Bell className="w-5 h-5" />
-            <span>Thông báo</span>
+            <span>{t('settings.notifications')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-secondary-900">Thông báo desktop</h4>
-              <p className="text-sm text-secondary-600">Hiển thị thông báo khi có hoạt động mới</p>
+              <h4 className="font-medium text-secondary-900">{t('settings.desktopNotifications')}</h4>
+              <p className="text-sm text-secondary-600">{t('settings.desktopNotificationsDesc')}</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -296,13 +298,13 @@ const Settings: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <SettingsIcon className="w-5 h-5" />
-            <span>Tin nhắn</span>
+            <span>{t('settings.messageSettings')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Delay giữa tin nhắn (s)
+              {t('settings.messageDelay')}
             </label>
             <Input
               type="number"
@@ -313,13 +315,13 @@ const Settings: React.FC = () => {
               step={1}
             />
             <p className="text-xs text-secondary-500 mt-1">
-              Thời gian chờ giữa các tin nhắn để tránh spam (0-600s)
+              {t('settings.messageDelayDesc')}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Số lần thử lại khi thất bại
+              {t('settings.maxRetries')}
             </label>
             <Input
               type="number"
@@ -329,7 +331,7 @@ const Settings: React.FC = () => {
               max={10}
             />
             <p className="text-xs text-secondary-500 mt-1">
-              Số lần thử lại khi gửi tin nhắn thất bại (0-10)
+              {t('settings.maxRetriesDesc')}
             </p>
           </div>
         </CardContent>
@@ -340,14 +342,14 @@ const Settings: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Database className="w-5 h-5" />
-            <span>Sao lưu & Khôi phục</span>
+            <span>{t('settings.backup')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-secondary-900">Tự động sao lưu</h4>
-              <p className="text-sm text-secondary-600">Tự động sao lưu dữ liệu định kỳ</p>
+              <h4 className="font-medium text-secondary-900">{t('settings.autoBackup')}</h4>
+              <p className="text-sm text-secondary-600">{t('settings.autoBackupDesc')}</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -363,7 +365,7 @@ const Settings: React.FC = () => {
           {config.backupEnabled && (
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Tần suất sao lưu (giờ)
+                {t('settings.backupInterval')}
               </label>
               <Input
                 type="number"
@@ -373,7 +375,7 @@ const Settings: React.FC = () => {
                 max={168}
               />
               <p className="text-xs text-secondary-500 mt-1">
-                Khoảng thời gian giữa các lần sao lưu tự động (1-168 giờ)
+                {t('settings.backupIntervalDesc')}
               </p>
             </div>
           )}
@@ -384,14 +386,14 @@ const Settings: React.FC = () => {
               onClick={handleExportData}
               icon={<Download className="w-4 h-4" />}
             >
-              Xuất dữ liệu
+              {t('settings.exportData')}
             </Button>
             <Button
               variant="outline"
               onClick={() => setShowRestoreModal(true)}
               icon={<Upload className="w-4 h-4" />}
             >
-              Khôi phục dữ liệu
+              {t('settings.importData')}
             </Button>
           </div>
         </CardContent>
@@ -402,14 +404,14 @@ const Settings: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Shield className="w-5 h-5" />
-            <span>Bảo mật</span>
+            <span>{t('settings.security')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-secondary-900">Tự động lưu</h4>
-              <p className="text-sm text-secondary-600">Tự động lưu thay đổi khi chỉnh sửa</p>
+              <h4 className="font-medium text-secondary-900">{t('settings.autoSave')}</h4>
+              <p className="text-sm text-secondary-600">{t('settings.autoSaveDesc')}</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -429,10 +431,10 @@ const Settings: React.FC = () => {
               className="text-error-600 border-error-300 hover:bg-error-50"
               icon={<RotateCcw className="w-4 h-4" />}
             >
-              Xóa tất cả dữ liệu
+              {t('settings.clearData')}
             </Button>
             <p className="text-xs text-secondary-500 mt-2">
-              Xóa toàn bộ dữ liệu ứng dụng. Hành động này không thể hoàn tác.
+              {t('settings.clearDataDesc')}
             </p>
           </div>
         </CardContent>
@@ -441,12 +443,12 @@ const Settings: React.FC = () => {
       {/* App Info & Update */}
       <Card>
         <CardHeader>
-          <CardTitle>Thông tin ứng dụng</CardTitle>
+          <CardTitle>{t('settings.appInfo')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-secondary-600">Phiên bản:</span>
+              <span className="text-secondary-600">{t('settings.version')}:</span>
               <Badge variant="outline">v{appVersion}</Badge>
             </div>
             <div className="flex justify-between">
@@ -469,24 +471,24 @@ const Settings: React.FC = () => {
               onClick={async () => {
                 const api = (window as any).electronAPI
                 if (!api?.updater) {
-                  toast.error('Tính năng cập nhật không khả dụng')
+                  toast.error(t('settings.updateUnavailable'))
                   return
                 }
-                toast.loading('Đang kiểm tra cập nhật...', { id: 'check-update' })
+                toast.loading(t('settings.checkingUpdate'), { id: 'check-update' })
                 const result = await api.updater.checkForUpdates()
                 toast.dismiss('check-update')
                 if (!result.success) {
-                  toast.error(`Lỗi: ${result.error}`)
+                  toast.error(`${t('common.error')}: ${result.error}`)
                 } else if (!result.updateInfo?.version || result.updateInfo.version === appVersion) {
-                  toast.success('Bạn đang sử dụng phiên bản mới nhất!')
+                  toast.success(t('settings.updateNotAvailable'))
                 }
               }}
               icon={<RefreshCw className="w-4 h-4" />}
             >
-              Kiểm tra cập nhật
+              {t('settings.checkUpdate')}
             </Button>
             <p className="text-xs text-secondary-500 mt-2">
-              Kiểm tra và tải về phiên bản mới nhất từ GitHub
+              {t('settings.checkUpdateDesc')}
             </p>
           </div>
         </CardContent>
@@ -496,18 +498,18 @@ const Settings: React.FC = () => {
       <Modal
         open={showRestoreModal}
         onClose={() => setShowRestoreModal(false)}
-        title="Khôi phục dữ liệu"
+        title={t('settings.restoreTitle')}
         size="lg"
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Dán dữ liệu backup (JSON)
+              {t('settings.restorePlaceholder')}
             </label>
             <textarea
               value={backupData}
               onChange={(e) => setBackupData(e.target.value)}
-              placeholder="Dán nội dung file backup JSON vào đây..."
+              placeholder={t('settings.restorePlaceholder')}
               rows={10}
               className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
             />
@@ -515,8 +517,7 @@ const Settings: React.FC = () => {
 
           <div className="p-3 bg-warning-50 border border-warning-200 rounded-lg">
             <p className="text-sm text-warning-800">
-              <strong>Cảnh báo:</strong> Việc khôi phục dữ liệu sẽ ghi đè lên tất cả dữ liệu hiện tại.
-              Hãy chắc chắn bạn đã sao lưu dữ liệu quan trọng trước khi thực hiện.
+              <strong>{t('common.warning')}:</strong> {t('settings.restoreWarning')}
             </p>
           </div>
 
@@ -525,13 +526,13 @@ const Settings: React.FC = () => {
               variant="outline"
               onClick={() => setShowRestoreModal(false)}
             >
-              Hủy
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleImportData}
               disabled={!backupData.trim()}
             >
-              Khôi phục
+              {t('settings.importData')}
             </Button>
           </div>
         </div>
